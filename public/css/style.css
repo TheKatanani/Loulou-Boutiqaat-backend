@@ -1,0 +1,11 @@
+body{
+  background-color: black;
+  color: #fff;
+  margin: auto;
+  text-align: center;
+  height: 100vh;
+  line-height: 25vh;
+}
+img{
+  border-radius: 50%;
+}

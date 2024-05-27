@@ -1,0 +1,109 @@
+nodemon
+node index.js every time you wanna start the application or use 
+nodemon index.js to lessen for the changes 
+// install nodemon npm i nodemon
+<TheKatanani/> // idea for my new logo
+thunder client  like postman
+
+ require('crypto').randomBytes(64).toString('hex')
+router.get('^/$|/index(.html)?', (req, res) => {
+  // res.sendFile('./views/index.html', {
+  //   root: __dirname
+  // })
+  res.sendFile(path.join(__dirname, 'views', 'index.html'))
+})
+
+// const router = express().router
+// const root = (req, res) => {
+//   router.route('^/$')
+//     .get(() => {
+//       res.json({
+//         'key': 'value'
+//       })
+//     })
+//     .post(() => {
+//       const {
+//         name,
+//         password
+//       } = req.body
+//       res.json({
+//         name,
+//         password
+//       })
+//     })
+//     .delete(() => {
+//       const id = req.body.id
+//       res.json({
+//         id
+//       })
+//     })
+// } 
+
+
+const express = require('express')
+const path = require('path')
+const cors = require('cors')
+const {
+  v4
+} = require('uuid')
+const {
+  errorHandler
+} = require('./middleware/errorHandler')
+const {
+  logger
+} = require('./middleware/logEvents')
+const app = express()
+const PORT = process.env.PORT || 3500
+// app.all('*', (req, res) => {
+//   res.status(404).send('this route is note available')
+// })
+
+//start cors
+const whiteList = [
+  'https://www.thekatanani.netlify.app',
+  'chrome-untrusted://new-tab-page',
+  'https://127.0.0.1:3000',
+  'https://127.0.0.1:3001',
+  'https://localhost:3500'
+]
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (whiteList.indexOf(origin) !== -1 || !origin) { //during the development //if you send from local get undefind for origin
+      callback(null, true) //the first parameter is errors and null mean no errors and the second allowd to access our api
+    } else {
+      callback(new Error('not allowd by cors'))
+    }
+  },
+  optionsSuccessStatus: 200
+}
+
+app.use(cors(corsOptions)) //cross origin resourse sharing
+//end cors
+
+app.use(express.static(path.join(__dirname, '/public')))
+app.use('/subdir', express.static(path.join(__dirname, '/public')))
+
+app.use('^/$', require('./router/root.js'))
+app.use('/subdir', require('./router/subdir'))
+app.use('/users',require('./router/api/users'))
+app.use(logger)
+app.all('*', (req, res) => {
+  // custom 404 page
+  res.status(404)
+  if (req.accepts('html')) {
+    res.sendFile(path.join(__dirname, 'views', '404.html'))
+  } else if (req.accepts('json')) {
+    res.send({
+      error: '404 Not Found'
+    })
+  } else {
+    res.type('txt').send('404 Not Found')
+  }
+})
+
+app.use(errorHandler)
+
+
+app.listen(PORT, () => {
+  console.log(`app listing on port ${PORT}`)
+})

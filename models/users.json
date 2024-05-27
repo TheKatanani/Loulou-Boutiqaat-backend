@@ -1,0 +1,59 @@
+[
+  {
+    "id": "whcVY5f",
+    "name": "habooba",
+    "phone": "+972592420453",
+    "password": "123zxcZXC!@#",
+    "gendar": "female",
+    "barthDay": "2002-03-05",
+    "roles": { "User": 2001 }
+  },
+  {
+    "id": "GPjTIRK",
+    "name": "thekatanani ",
+    "phone": "+970592263808",
+    "password": "123123123",
+    "gendar": "male",
+    "barthDay": "2002-07-08",
+    "roles": { "User": 2001 }
+  },
+  {
+    "id": "d16sD42",
+    "name": "osama al mozanen",
+    "phone": "+972599231180",
+    "password": "123zxcZXC!@#",
+    "gendar": "male",
+    "barthDay": "2000-11-06",
+    "roles": { "User": 2001 }
+  },
+  {
+    "id": "_ihCOPN",
+    "name": "sameer katanani",
+    "phone": "+972567124697",
+    "password": "12345678",
+    "gendar": "male",
+    "barthDay": "2006-02-07",
+    "roles": { "User": 2001 },
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoic2FtZWVyIGthdGFuYW5pIiwiaWF0IjoxNzE1OTYwNzM4LCJleHAiOjE3MTYwNDcxMzh9.naMiBO2wfjVi11YH0r4GTsTp9dpEpOMJgJqsP-IW-bI"
+  },
+  {
+    "id": "eHb629N",
+    "name": "theKatanani",
+    "phone": "+972567124698",
+    "password": "123zxcZXC!@#",
+    "gendar": "male",
+    "barthDay": "2002-07-08",
+    "roles": { "Admin": 5150 },
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoidGhlS2F0YW5hbmkiLCJpYXQiOjE3MTU5NjA4MDksImV4cCI6MTcxNjA0NzIwOX0.u_9kCs-YmBu19UuvLy70t8wu-pAqbDXJzJVk2QGpOqg"
+  },
+  {
+    "id": "VpvOmlE",
+    "name": "Mohammed Katanani",
+    "phone": "+972592263808",
+    "password": "12345678",
+    "gendar": "male",
+    "barthDay": "2002-07-08",
+    "roles": { "Editor": 1984 },
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiTW9oYW1tZWQgS2F0YW5hbmkiLCJpYXQiOjE3MTU5NjAyMzYsImV4cCI6MTcxNjA0NjYzNn0.oZ67brC2AnF1oITGjUiO8Of8fAuox_qah070NgSavhU"
+  }
+]
