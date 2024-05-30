@@ -26,11 +26,14 @@ db.sequelize = sequelize
 db.users = require('./user.js')(sequelize,Sequelize.DataTypes)
 db.products = require('./product.js')(sequelize,Sequelize.DataTypes)
 db.cart = require('./cart.js')(sequelize,Sequelize.DataTypes)
+db.saved = require('./saved.js')(sequelize,Sequelize.DataTypes)
+db.category = require('./category.js')(sequelize,Sequelize.DataTypes)
+db.countryCode  = require('./countryCode.js')(sequelize,Sequelize.DataTypes)
 async function test(){
   await db.sequelize.sync({
     focus: false
   })
 }
 test()
- 
+
 module.exports = db

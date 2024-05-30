@@ -1,6 +1,3 @@
-const {
-  Op
-} = require("sequelize")
 const db = require("../models")
 const Cart = db.cart
 
@@ -11,7 +8,7 @@ const getCartItems = async (req, res) => {
       where: {
         id
       },
-      attributes:["productId","quantity"]
+      attributes: ["productId", "quantity"]
     })
     res.status(200).json({
       data: cartItems,
@@ -41,35 +38,25 @@ const addToCart = async (req, res) => {
     })
   } catch (err) {
     res.json({
-      message: err
+      message: err.errors[0].message 
     })
   }
 }
 const deleteFromCart = async (req, res) => {
   const id = req.id
-  const productId = req.params.id 
+  const productId = req.params.id
   try {
-    const foundedItem = await User.findOne({
+    const foundedItem = await Cart.findOne({
       where: {
-        [Op.and]: [{
-            productId
-          },
-          {
-            userId: id
-          }
-        ]
+        productId, 
+        userId: id 
       }
     })
     if (foundedItem) {
       await Cart.destroy({
-        where: {
-          [Op.and]: [{
-              productId
-            },
-            {
-              userId: id
-            }
-          ]
+        where: { 
+            productId,
+            userId: id 
         }
       })
       res.json({
@@ -80,15 +67,14 @@ const deleteFromCart = async (req, res) => {
         message: `Cart item with product ID ${productId} Is Not Found!`
       })
     }
-  } catch (err) {
-    res.json({
+  } catch (err) { 
+    res.status(400).json({
       message: err
     })
   }
 }
-const clearCart = async (req, res) => {
+const clearCart = async (req, res) => { 
   const id = req.id
-
   try {
     await Cart.destroy({
       where: {
@@ -100,7 +86,7 @@ const clearCart = async (req, res) => {
     })
 
   } catch (err) {
-    res.json({
+    res.status(400).json({
       message: err
     })
   }
@@ -112,47 +98,37 @@ const quantityCartItem = async (req, res) => {
     operator
   } = req.body
   try {
-    const foundedItem = await User.findOne({
-      where: {
-        [Op.and]: [{
-            productId
-          },
-          {
-            userId: id
-          }
-        ]
+
+    const foundedItem = await Cart.findOne({
+      where: { 
+            productId ,
+            userId: id 
       }
     })
-    if (foundedItem) {
+ 
+    if (foundedItem) { 
       if (foundedItem?.quantity >= 1) {
+        console.log("foundedItem.quantity",foundedItem.quantity)
+        const newQuantity = (operator === "increase" ? ++foundedItem.quantity : --foundedItem.quantity)
+        console.log(newQuantity)
         await Cart.update({
-          quantity: (operator === "increase" ? ++quantity : --quantity)
+          quantity: newQuantity
         }, {
-          where: {
-            [Op.and]: [{
-                productId
-              },
-              {
-                userId: id
-              }
-            ]
+          where: { 
+            productId,
+            userId: id 
           }
-        })
+        }) 
       } else {
         await Cart.destroy({
-          where: {
-            [Op.and]: [{
-                productId
-              },
-              {
-                userId: id
-              }
-            ]
+          where: { 
+                productId,
+                userId: id 
           }
         })
       }
       res.json({
-        success: `the cart item with product ID:${productId} was deleted!`
+        success: `Update Quantity cart item with product ID:${productId} !`
       })
     } else {
       res.status(400).json({

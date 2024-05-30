@@ -1,5 +1,7 @@
-module.exports = (sequelize, DataTypes) => {
-  const User = sequelize.define('user', {
+"use strict";
+
+module.exports = function (sequelize, DataTypes) {
+  var User = sequelize.define('user', {
     name: {
       type: DataTypes.STRING,
       alowNall: false,
@@ -15,12 +17,14 @@ module.exports = (sequelize, DataTypes) => {
     barthDay: DataTypes.STRING,
     gender: DataTypes.STRING,
     roles: DataTypes.JSON,
-    refreshToken:DataTypes.STRING
+    refreshToken: DataTypes.STRING
   }, {
-    freezetableName: true,
-  })
-  User.associate = models => {
-    Category.hasMany(models.Category)
-  }
+    freezetableName: true
+  });
+
+  User.associate = function (models) {
+    Category.hasMany(models.Category);
+  };
+
   return User;
-}
+};

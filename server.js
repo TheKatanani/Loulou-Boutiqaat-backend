@@ -50,6 +50,9 @@ app.use(verifyJWT)
 app.use('/users', require('./router/api/users'))
 app.use('/product', require('./router/api/product.js'))
 app.use('/cart', require('./router/api/cart.js'))
+app.use('/saved', require('./router/api/saved.js'))
+app.use('/category', require('./router/api/category.js'))
+app.use('/countryCode', require('./router/api/countryCode.js'))
 
 
 
