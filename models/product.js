@@ -4,12 +4,32 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    price: DataTypes.INTEGER,
-    prevPrice: DataTypes.INTEGER,
+    price:{
+      type:DataTypes.INTEGER,
+      defaultVaule:0
+    },
+    prevPrice:{
+      type:DataTypes.INTEGER,
+      defaultVaule:0
+    },
+    count:{
+      type:DataTypes.INTEGER,
+      defaultVaule:0
+    },
     images: DataTypes.JSON,  
-    stars: DataTypes.INTEGER,
+    stars: {
+      type:DataTypes.INTEGER,
+      defaultVaule:1
+    },
     description: DataTypes.TEXT, 
-    published: DataTypes.BOOLEAN,
+    categoryId:{
+      type:DataTypes.STRING,
+      allowNull:false
+    },
+    published: {
+      type:DataTypes.BOOLEAN,
+      defaultVaule:false
+    },
   })
   return Product
 } 

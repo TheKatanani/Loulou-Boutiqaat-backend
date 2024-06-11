@@ -1,9 +1,8 @@
 const verifyRoles = (...allowdRoles) => {
-  return (req, res, next) => {
+  return (req, res, next) => { 
+    console.log(req?.roles)
     if (!req?.roles) return res.sendStatus(401) // update this and handle it with jwt
-    const rolesArray = [...allowdRoles]
-    // console.log('req.roles=>',req.roles)
-    // const result = rolesArray.includes(req.roles)
+    const rolesArray = [...allowdRoles]  
     const result = req.roles.map(role => rolesArray.includes(role)).find(val => val === true) //true and false arrays this filter to find one true
     if (!result) return res.sendStatus(401)
     next()

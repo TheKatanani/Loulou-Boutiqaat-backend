@@ -2,17 +2,17 @@ const db = require("../models")
 const Cart = db.cart
 
 const getCartItems = async (req, res) => {
-  const id = req.id
+  const userId = req.id
   try {
     const cartItems = await Cart.findAll({
       where: {
-        id
+        userId 
       },
       attributes: ["productId", "quantity"]
     })
     res.status(200).json({
       data: cartItems,
-      userId: id
+      userId 
     })
   } catch (err) {
     res.json({
@@ -108,9 +108,7 @@ const quantityCartItem = async (req, res) => {
  
     if (foundedItem) { 
       if (foundedItem?.quantity >= 1) {
-        console.log("foundedItem.quantity",foundedItem.quantity)
         const newQuantity = (operator === "increase" ? ++foundedItem.quantity : --foundedItem.quantity)
-        console.log(newQuantity)
         await Cart.update({
           quantity: newQuantity
         }, {

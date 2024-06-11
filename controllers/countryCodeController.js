@@ -49,7 +49,7 @@ const updateCountryCode = async (req, res) => {
         success: `Country Code Updated Successfolly!`
       })
     } else {
-      res.status(400).json({
+      res.status(404).json({
         message: `can not found this Country Code!`
       })
     }
@@ -68,7 +68,7 @@ const deleteCountryCode = async (req, res) => {
       }
     })
     if(foundedItem){ 
-      await Category.destroy({
+      await CountryCode.destroy({
         where: {
           id 
         }
@@ -77,7 +77,7 @@ const deleteCountryCode = async (req, res) => {
         message: 'Country Code is deleted!'
       })
     }else {
-      res.status(400).json({
+      res.status(404).json({
         message: 'Country Code is not found!'
       })
     }

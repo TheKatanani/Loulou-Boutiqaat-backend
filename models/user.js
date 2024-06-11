@@ -9,13 +9,19 @@ module.exports = (sequelize, DataTypes) => {
     },
     phone: {
       type: DataTypes.STRING,
-      uniqe: true
+      unique: true
     },
-    password: DataTypes.STRING,
+    password:{
+      type:DataTypes.STRING,
+      require:true
+    },
     barthDay: DataTypes.STRING,
-    gender: DataTypes.STRING,
+    gender: {
+      type: DataTypes.STRING,
+      defaultValue: 'female'
+    },
     roles: DataTypes.JSON,
-    refreshToken:DataTypes.STRING
+    refreshToken: DataTypes.STRING
   }, {
     freezetableName: true,
   })

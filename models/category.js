@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type: DataTypes.STRING,
       allowNull: false,
+      unique:true
     },
     description: DataTypes.TEXT, 
     background: DataTypes.TEXT,  
@@ -12,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BOOLEAN,
       defaultValue:false
     },
-    userId:DataTypes.INTEGER
+    // userId:DataTypes.INTEGER
   })
   Category.associate = models => {
     Category.belongsTo(models.User)

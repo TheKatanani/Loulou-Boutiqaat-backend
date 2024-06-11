@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const {
   getAllUsers,
-  // createUser,
+  createUser,
   updateUser,
   deleteUser,
   getUser
@@ -11,9 +11,10 @@ const verifyRoles = require('../../middleware/verifyRoles')
 const ROLES_LIST = require('../../config/roles_list')
 
 router.route('/')
-  .get(verifyRoles(ROLES_LIST.Editor, ROLES_LIST.Admin),getAllUsers) 
-  router.route('/:id')
-  .put(verifyRoles(ROLES_LIST.Editor, ROLES_LIST.Admin), updateUser)
-  .delete(verifyRoles(ROLES_LIST.Admin), deleteUser)
-  .get(verifyRoles(ROLES_LIST.User, ROLES_LIST.Editor, ROLES_LIST.Admin), getUser)
+  .get(verifyRoles(ROLES_LIST.EDITOR, ROLES_LIST.ADMIN), getAllUsers)
+  .post(verifyRoles(ROLES_LIST.ADMIN), createUser)
+router.route('/:id')
+  .put(verifyRoles(ROLES_LIST.ADMIN), updateUser)
+  .delete(verifyRoles(ROLES_LIST.ADMIN), deleteUser)
+  .get(getUser)
 module.exports = router

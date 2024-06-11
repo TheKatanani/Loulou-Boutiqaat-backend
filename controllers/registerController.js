@@ -1,19 +1,18 @@
 const bcrypt = require('bcrypt')
 const ROLES_LIST = require('../config/roles_list')
-const {
-  v4
-} = require('uuid')
+
 const db = require('../models')
 const User = db.users
-const createUser = async (req, res) => { 
-  const user = {
-    "id": v4(),
+const createUser = async (req, res) => {
+  const user = { 
     "name": req.body?.name,
     "phone": req.body?.phone,
     "password": req.body?.password,
-    "gendar": req.body?.gendar,
+    "gender": req.body?.gender,
     "barthDay": req.body?.barthDay,
-    "roles":  req.body?.roles
+    "roles": {
+      User: ROLES_LIST.User
+    }
   } //new user
   // you must add validation here  
   const isExist = await User.findOne({

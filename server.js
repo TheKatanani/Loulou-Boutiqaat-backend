@@ -13,17 +13,19 @@ const {
 } = require('./config/corsOption.js')
 const verifyJWT = require('./middleware/verifyJWT.js')
 const cookieParser = require('cookie-parser')
-const credentials = require('./middleware/credentials.js') 
+const credentials = require('./middleware/credentials.js')
 
 const app = express()
 const PORT = process.env.PORT || 3500
 
-app.use(bodyParser.json());
+app.use(bodyParser.json({
+  estended:true,limit:'50mb'
+}));
 
 // middleware to handle urlencoded form data
 app.use(express.urlencoded({
   extended: false
-})) 
+}))
 // middleware for cookies
 app.use(express.json())
 
@@ -33,6 +35,12 @@ app.use(cookieParser())
 app.use(credentials)
 //cross origin resourse sharing 
 app.use(cors(corsOptions))
+// app.use(cors({
+//   origin:'http://localhost:3001',
+//   allowHeaders:['Authorization'],
+//   credentials:true,
+//   methods:['GET','POST','PUT','DELETE']
+// })) 
 
 app.use(express.static(path.join(__dirname, '/public')))
 
@@ -43,20 +51,19 @@ app.use('/login', require('./router/auth'))
 app.use('/refresh', require('./router/refresh'))
 app.use('/logout', require('./router/logout'))
 
+// API
+app.use('/product', require('./router/api/product.js'))
+app.use('/countryCode', require('./router/api/countryCode.js'))
+app.use('/category', require('./router/api/category.js'))
 //any route under this line must verify by jwt
 app.use(verifyJWT)
-
-// API
 app.use('/users', require('./router/api/users'))
-app.use('/product', require('./router/api/product.js'))
 app.use('/cart', require('./router/api/cart.js'))
 app.use('/saved', require('./router/api/saved.js'))
-app.use('/category', require('./router/api/category.js'))
-app.use('/countryCode', require('./router/api/countryCode.js'))
 
 
 
-app.use(logger)
+app.use(logger) //DOES NOT WORK
 app.all('*', (req, res) => {
   res.status(404)
   if (req.accepts('html')) {

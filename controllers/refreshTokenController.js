@@ -1,34 +1,46 @@
-const users = {
-  data: require('../models/users.json'),
-  setData: (data) => this.data = data
-}
 const jwt = require('jsonwebtoken')
+const db = require('../models')
+const User = db.users
 require('dotenv').config()
-const handleRefreshToken = (req, res) => {
+const handleRefreshToken = async (req, res) => {
   const cookies = req.cookies
   if (!cookies?.jwt) return res.sendStatus(401) // unauthorized
   const refreshToken = cookies.jwt
-  const foundUser = users.data.find(_user => _user.refreshToken === refreshToken)
-  if (!foundUser) return res.sendStatus(403) //forbidden
-  jwt.verify(
-    refreshToken,
-    process.env.REFRESH_TOKEN_SECRET,
-    (err, decoded) => {
-      if (err || foundUser.name !== decoded.name) return res.sendStatus(403)
-      // const roles = Object.values(foundUser.roles)
-      const accessToken = jwt.sign({
-          name: decoded.name,
-          // roles
-        },
-        process.env.ACCESS_TOKEN_SECRET, {
-          expiresIn: '30s' // set it logner in production app
-        }
-      )
-      res.json({
-        accessToken
-      })
-    }
-  ) 
+  try {
+    const foundUser = await User.findOne({
+      where: {
+        refreshToken
+      }
+    })
+    if (!foundUser) return res.sendStatus(403) //forbidden
+    jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_SECRET,
+      (err, decoded) => {
+        if (err) return res.sendStatus(403)
+        const roles = Object.values(JSON.parse(foundUser?.roles))
+        console.log(roles)
+        const accessToken = jwt.sign({
+            userInfo: {
+              name: foundUser.name,
+              roles,
+              id: foundUser.id
+            }
+          },
+          process.env.ACCESS_TOKEN_SECRET, {
+            expiresIn: '15m'
+          }
+        )
+        res.json({
+          accessToken
+        })
+      }
+    )
+  } catch (err) {
+    res.status(400).json({
+      message: err
+    })
+  }
 }
 
 module.exports = {
