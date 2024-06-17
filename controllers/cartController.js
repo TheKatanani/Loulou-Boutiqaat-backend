@@ -1,3 +1,6 @@
+const {
+  OPERATOR
+} = require("../Actions")
 const db = require("../models")
 const Cart = db.cart
 
@@ -6,16 +9,51 @@ const getCartItems = async (req, res) => {
   try {
     const cartItems = await Cart.findAll({
       where: {
-        userId 
+        userId
       },
       attributes: ["productId", "quantity"]
     })
     res.status(200).json({
       data: cartItems,
-      userId 
+      userId
     })
   } catch (err) {
     res.json({
+      message: err
+    })
+  }
+}
+const uploadLocalCart = async (req, res) => {
+  const userId = req.id
+  const {
+    localCart
+  } = req.body
+  try {  
+    localCart?.map(async (item) => {
+      const founded =await Cart.findOne({
+        where:{
+          productId:item.productId,
+          userId
+        }
+      }) 
+      item = {
+        ...item,
+        userId,
+      } 
+      if (founded) { 
+        await Cart.update(item, {
+          where: {
+            userId,
+            productId: item.productId
+          }
+        })
+      } else { 
+        await Cart.create(item)
+      }
+    }) 
+    res.sendStatus(201) 
+  } catch (err) {
+    res.status(400).json({
       message: err
     })
   }
@@ -34,11 +72,12 @@ const addToCart = async (req, res) => {
   try {
     await Cart.create(cartItem)
     res.status(201).json({
-      success: `Cart Item Created Successfolly!`
+      productId,
+      quantity
     })
   } catch (err) {
-    res.json({
-      message: err.errors[0].message 
+    res.status(400).json({
+      message: err
     })
   }
 }
@@ -48,32 +87,30 @@ const deleteFromCart = async (req, res) => {
   try {
     const foundedItem = await Cart.findOne({
       where: {
-        productId, 
-        userId: id 
+        productId,
+        userId: id
       }
     })
     if (foundedItem) {
       await Cart.destroy({
-        where: { 
-            productId,
-            userId: id 
+        where: {
+          productId,
+          userId: id
         }
       })
-      res.json({
-        success: `the cart item with product ID:${productId} was deleted!`
-      })
+      res.json(productId)
     } else {
       res.status(400).json({
         message: `Cart item with product ID ${productId} Is Not Found!`
       })
     }
-  } catch (err) { 
+  } catch (err) {
     res.status(400).json({
       message: err
     })
   }
 }
-const clearCart = async (req, res) => { 
+const clearCart = async (req, res) => {
   const id = req.id
   try {
     await Cart.destroy({
@@ -92,49 +129,51 @@ const clearCart = async (req, res) => {
   }
 }
 const quantityCartItem = async (req, res) => {
-  const id = req.id
+  const userId = req.id
+  const productId = req.params.id
   const {
-    productId,
     operator
   } = req.body
   try {
-
     const foundedItem = await Cart.findOne({
-      where: { 
-            productId ,
-            userId: id 
+      where: {
+        productId,
+        userId
       }
     })
- 
-    if (foundedItem) { 
-      if (foundedItem?.quantity >= 1) {
-        const newQuantity = (operator === "increase" ? ++foundedItem.quantity : --foundedItem.quantity)
+    if (foundedItem) {
+      if (foundedItem?.quantity <= 0 && operator === OPERATOR.DECREASE) {
+        await Cart.destroy({
+          where: {
+            productId,
+            userId
+          }
+        })
+      } else {
+        const newQuantity = (operator === OPERATOR.INCREASE ? ++foundedItem.quantity : --foundedItem.quantity)
         await Cart.update({
           quantity: newQuantity
         }, {
-          where: { 
+          where: {
             productId,
-            userId: id 
-          }
-        }) 
-      } else {
-        await Cart.destroy({
-          where: { 
-                productId,
-                userId: id 
+            userId
           }
         })
       }
-      res.json({
-        success: `Update Quantity cart item with product ID:${productId} !`
+      const cartItems = await Cart.findAll({
+        where: {
+          userId
+        },
+        attributes: ["productId", "quantity"]
       })
+      res.json(cartItems)
     } else {
       res.status(400).json({
         message: `Cart item with product ID ${productId} Is Not Found!`
       })
     }
   } catch (err) {
-    res.json({
+    res.status(400).json({
       message: err
     })
   }
@@ -144,5 +183,6 @@ module.exports = {
   getCartItems,
   deleteFromCart,
   clearCart,
-  quantityCartItem
+  quantityCartItem,
+  uploadLocalCart
 }

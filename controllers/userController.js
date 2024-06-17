@@ -87,8 +87,7 @@ const updateUser = async (req, res) => {
         barthDay: foundedUser.barthDay,
         roles: foundedUser.roles,
         ...user
-      } //new user 
-      console.log(updatedUser)
+      } //new user  
       await User.update(updatedUser, {
         where: {
           id

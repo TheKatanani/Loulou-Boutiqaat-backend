@@ -18,11 +18,10 @@ const handleRefreshToken = async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET,
       (err, decoded) => {
         if (err) return res.sendStatus(403)
-        const roles = Object.values(JSON.parse(foundUser?.roles))
-        console.log(roles)
+        const roles = Object.values(JSON.parse(foundUser?.roles)) 
         const accessToken = jwt.sign({
             userInfo: {
-              name: foundUser.name,
+              name: foundUser.name,// || decoded.userInfo.name
               roles,
               id: foundUser.id
             }

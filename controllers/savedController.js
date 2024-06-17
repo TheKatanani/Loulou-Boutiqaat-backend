@@ -6,12 +6,13 @@ const getSavedItems = async (req, res) => {
   try {
     const savedItems = await Saved.findAll({
       where: {
-        userId:id
+        userId: id
       },
       attributes: ["productId"]
     })
+    const saved = savedItems.map(el => el.productId) 
     res.status(200).json({
-      data: savedItems,
+      data: saved,
       userId: id
     })
   } catch (err) {
@@ -23,20 +24,53 @@ const getSavedItems = async (req, res) => {
 const addToSaved = async (req, res) => {
   const id = req.id
   const {
-    productId 
+    productId
   } = req.body
   const savedItem = {
     productId,
-    userId: id 
+    userId: id
   }
   try {
     await Saved.create(savedItem)
-    res.status(201).json({
-      success: `Saved Item Created Successfolly!`
-    })
+    res.status(201).json(productId)
   } catch (err) {
     res.status(400).json({
-      message: err.errors[0].message 
+      message: err
+    })
+  }
+}
+const uploadLocalSaved = async (req, res) => {
+  const userId = req.id
+  const {
+    localSaved
+  } = req.body
+  try {  
+    localSaved?.map(async (productId) => {
+      const founded =await Saved.findOne({
+        where:{
+          productId,
+          userId
+        }
+      }) 
+      let item = {
+        productId,
+        userId,
+      } 
+      if (founded) { 
+        await Saved.update(item, {
+          where: {
+            userId,
+            productId 
+          }
+        })
+      } else { 
+        await Saved.create(item)
+      }
+    }) 
+    res.sendStatus(201) 
+  } catch (err) {
+    res.status(400).json({
+      message: err
     })
   }
 }
@@ -46,32 +80,30 @@ const deleteFromSaved = async (req, res) => {
   try {
     const foundedItem = await Saved.findOne({
       where: {
-        productId, 
-        userId: id 
+        productId,
+        userId: id
       }
     })
     if (foundedItem) {
       await Saved.destroy({
-        where: { 
-            productId,
-            userId: id 
+        where: {
+          productId,
+          userId: id
         }
       })
-      res.json({
-        success: `the saved item with product ID:${productId} was deleted!`
-      })
+      res.json(productId)
     } else {
-      res.status(400).json({
+      res.status(404).json({
         message: `saved item with product ID ${productId} Is Not Found!`
       })
     }
-  } catch (err) { 
+  } catch (err) {
     res.status(400).json({
       message: err
     })
   }
 }
-const clearSaved = async (req, res) => { 
+const clearSaved = async (req, res) => {
   const id = req.id
   try {
     await Saved.destroy({
@@ -89,10 +121,11 @@ const clearSaved = async (req, res) => {
     })
   }
 }
- 
+
 module.exports = {
   addToSaved,
   getSavedItems,
   deleteFromSaved,
-  clearSaved 
+  clearSaved,
+  uploadLocalSaved
 }

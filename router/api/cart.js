@@ -5,16 +5,18 @@ const {
   getCartItems,
   quantityCartItem,
   deleteFromCart,
-  addToCart
+  addToCart,
+  uploadLocalCart
 } = require('../../controllers/cartController')
 
 router.route('/clearCart')
   .delete(clearCart)
 router.route('/:id')
   .delete(deleteFromCart)
+  .put(quantityCartItem)
 
 router.route('/')
   .get(getCartItems)
-  .put(quantityCartItem) // update quantity and add the operator 
   .post(addToCart)
+  .put(uploadLocalCart)
 module.exports = router

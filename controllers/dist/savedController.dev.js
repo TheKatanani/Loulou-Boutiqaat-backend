@@ -5,7 +5,7 @@ var db = require("../models");
 var Saved = db.saved;
 
 var getSavedItems = function getSavedItems(req, res) {
-  var id, savedItems;
+  var id, savedItems, saved;
   return regeneratorRuntime.async(function getSavedItems$(_context) {
     while (1) {
       switch (_context.prev = _context.next) {
@@ -22,26 +22,29 @@ var getSavedItems = function getSavedItems(req, res) {
 
         case 4:
           savedItems = _context.sent;
+          saved = savedItems.map(function (el) {
+            return el.productId;
+          });
           res.status(200).json({
-            data: savedItems,
+            data: saved,
             userId: id
           });
-          _context.next = 11;
+          _context.next = 12;
           break;
 
-        case 8:
-          _context.prev = 8;
+        case 9:
+          _context.prev = 9;
           _context.t0 = _context["catch"](1);
           res.status(400).json({
             message: _context.t0
           });
 
-        case 11:
+        case 12:
         case "end":
           return _context.stop();
       }
     }
-  }, null, null, [[1, 8]]);
+  }, null, null, [[1, 9]]);
 };
 
 var addToSaved = function addToSaved(req, res) {
@@ -61,9 +64,7 @@ var addToSaved = function addToSaved(req, res) {
           return regeneratorRuntime.awrap(Saved.create(savedItem));
 
         case 6:
-          res.status(201).json({
-            success: "Saved Item Created Successfolly!"
-          });
+          res.status(201).json(productId);
           _context2.next = 12;
           break;
 
@@ -71,7 +72,7 @@ var addToSaved = function addToSaved(req, res) {
           _context2.prev = 9;
           _context2.t0 = _context2["catch"](3);
           res.status(400).json({
-            message: _context2.t0.errors[0].message
+            message: _context2.t0
           });
 
         case 12:
@@ -116,14 +117,12 @@ var deleteFromSaved = function deleteFromSaved(req, res) {
           }));
 
         case 9:
-          res.json({
-            success: "the saved item with product ID:".concat(productId, " was deleted!")
-          });
+          res.json(productId);
           _context3.next = 13;
           break;
 
         case 12:
-          res.status(400).json({
+          res.status(404).json({
             message: "saved item with product ID ".concat(productId, " Is Not Found!")
           });
 

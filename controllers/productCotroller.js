@@ -118,12 +118,12 @@ const getPublishedProducts = async (req, res) => {
       where: {
         published: true,
       }
-    })
+    }) 
     let newProducts = products.map(product => {
-      product.images = JSON.parse(JSON.parse(product.images))
+      product.images = JSON.parse(product.images)
       return product
-    })
-    res.status(200).send(newProducts)
+    }) 
+    res.status(200).json(newProducts)
   } catch (err) {
     res.status(400).json({
       message: err
