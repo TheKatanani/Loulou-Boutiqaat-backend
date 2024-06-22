@@ -32,6 +32,8 @@ db.cart = require('./cart.js')(sequelize, Sequelize.DataTypes);
 db.saved = require('./saved.js')(sequelize, Sequelize.DataTypes);
 db.category = require('./category.js')(sequelize, Sequelize.DataTypes);
 db.countryCode = require('./countryCode.js')(sequelize, Sequelize.DataTypes);
+db.social = require('./social.js')(sequelize, Sequelize.DataTypes);
+db.order = require('./order.js')(sequelize, Sequelize.DataTypes);
 
 function test() {
   return regeneratorRuntime.async(function test$(_context) {

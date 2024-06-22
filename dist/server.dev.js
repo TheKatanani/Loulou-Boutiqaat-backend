@@ -61,6 +61,8 @@ app.use(verifyJWT);
 app.use('/users', require('./router/api/users'));
 app.use('/cart', require('./router/api/cart.js'));
 app.use('/saved', require('./router/api/saved.js'));
+app.use('/social', require('./router/api/social.js'));
+app.use('/order', require('./router/api/order.js'));
 app.use(logger); //DOES NOT WORK
 
 app.all('*', function (req, res) {

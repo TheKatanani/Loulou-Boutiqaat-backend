@@ -27,7 +27,7 @@ const addProduct = async (req, res) => {
     published: req.body?.published || false
   }
   try {
-    const product = await Product.create(info) 
+    const product = await Product.create(info)
 
     res.status(201).json(product)
   } catch (err) {
@@ -95,7 +95,7 @@ const deleteProduct = async (req, res) => {
       message: err
     })
   }
-} 
+}
 const getProduct = async (req, res) => {
   const id = req.params.id
   try {
@@ -104,7 +104,7 @@ const getProduct = async (req, res) => {
         id: id
       }
     })
-    product.images = JSON.parse(JSON.parse(product.images))
+    product.images = JSON.parse(product.images)
     res.status(200).json(product)
   } catch (err) {
     res.status(400).json({
@@ -118,11 +118,11 @@ const getPublishedProducts = async (req, res) => {
       where: {
         published: true,
       }
-    }) 
+    })
     let newProducts = products.map(product => {
       product.images = JSON.parse(product.images)
       return product
-    }) 
+    })
     res.status(200).json(newProducts)
   } catch (err) {
     res.status(400).json({

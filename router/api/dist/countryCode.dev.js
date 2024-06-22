@@ -16,6 +16,6 @@ var verifyRoles = require('../../middleware/verifyRoles.js');
 
 var ROLES_LIST = require('../../config/roles_list.js');
 
-router.route('/').get(getCountryCode).post(verifyJWT, verifyRoles([ROLES_LIST.Admin, ROLES_LIST.Editor]), addCountryCode);
-router.route('/:id').put(verifyJWT, verifyRoles([ROLES_LIST.Admin, ROLES_LIST.Editor]), updateCountryCode)["delete"](verifyJWT, verifyRoles([ROLES_LIST.Admin]), deleteCountryCode);
+router.route('/').get(getCountryCode).post(verifyJWT, verifyRoles([ROLES_LIST.ADMIN, ROLES_LIST.EDITOR]), addCountryCode);
+router.route('/:id').put(verifyJWT, verifyRoles([ROLES_LIST.ADMIN, ROLES_LIST.EDITOR]), updateCountryCode)["delete"](verifyJWT, verifyRoles([ROLES_LIST.ADMIN]), deleteCountryCode);
 module.exports = router;

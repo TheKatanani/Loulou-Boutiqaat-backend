@@ -18,7 +18,7 @@ var ROLES_LIST = require('../../config/roles_list');
 
 var verifyJWT = require('../../middleware/verifyJWT');
 
-router.route('/').get(getProducts).post(verifyJWT, verifyRoles(ROLES_LIST.Admin, ROLES_LIST.Editor), addProduct);
+router.route('/').get(getProducts).post(verifyJWT, verifyRoles(ROLES_LIST.ADMIN, ROLES_LIST.EDITOR), addProduct);
 router.route('/published').get(getPublishedProducts);
-router.route('/:id').get(verifyRoles(ROLES_LIST.User, ROLES_LIST.Editor, ROLES_LIST.Admin), getProduct).put(verifyJWT, verifyRoles(ROLES_LIST.Editor, ROLES_LIST.Admin), updateProduct)["delete"](verifyJWT, verifyRoles(ROLES_LIST.Admin), deleteProduct);
+router.route('/:id').get(verifyRoles(ROLES_LIST.USER, ROLES_LIST.EDITOR, ROLES_LIST.ADMIN), getProduct).put(verifyJWT, verifyRoles(ROLES_LIST.EDITOR, ROLES_LIST.ADMIN), updateProduct)["delete"](verifyJWT, verifyRoles(ROLES_LIST.ADMIN), deleteProduct);
 module.exports = router;
