@@ -74,9 +74,7 @@ const deleteOrder = async (req, res) => {
           id
         }
       })
-      res.status(200).json({
-        message: 'order is deleted!'
-      })
+      res.status(200).json(id)
     } else {
       res.status(404).json({
         message: 'order is not found!'
@@ -96,7 +94,7 @@ const getOrder = async (req, res) => {
         id
       }
     })
-    order.orders =  JSON.parse(order.orders) 
+    order.orders = JSON.parse(order.orders)
     res.status(200).json(order)
   } catch (err) {
     res.status(400).json({

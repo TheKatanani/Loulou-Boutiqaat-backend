@@ -179,9 +179,7 @@ var deleteOrder = function deleteOrder(req, res) {
           }));
 
         case 8:
-          res.status(200).json({
-            message: 'order is deleted!'
-          });
+          res.status(200).json(id);
           _context4.next = 12;
           break;
 

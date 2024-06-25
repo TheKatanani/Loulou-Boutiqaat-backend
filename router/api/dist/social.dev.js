@@ -12,5 +12,7 @@ var verifyRoles = require('../../middleware/verifyRoles');
 
 var ROLES_LIST = require('../../config/roles_list');
 
-router.route('/').get(getSocialItems).put(verifyRoles(ROLES_LIST.ADMIN, ROLES_LIST.EDITOR), updateSocial);
+var verifyJWT = require('../../middleware/verifyJWT');
+
+router.route('/').get(getSocialItems).put(verifyJWT, verifyRoles(ROLES_LIST.ADMIN, ROLES_LIST.EDITOR), updateSocial);
 module.exports = router;
