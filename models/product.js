@@ -1,3 +1,6 @@
+const db = require(".")
+
+const Category = db.category
 module.exports = (sequelize, DataTypes) => {
   const Product = sequelize.define('product', {
     name: {
@@ -24,7 +27,11 @@ module.exports = (sequelize, DataTypes) => {
     description: DataTypes.TEXT, 
     categoryId:{
       type:DataTypes.STRING,
-      allowNull:false
+      allowNull:false,
+      // references: {
+      //   model: Category,
+      //   key: 'id'
+      // }
     },
     published: {
       type:DataTypes.BOOLEAN,

@@ -6,7 +6,7 @@ var Product = db.products;
 var User = db.users;
 
 module.exports = function (sequelize, DataTypes) {
-  var Saved = sequelize.define('saved', {
+  var Cart = sequelize.define('cart', {
     productId: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -19,13 +19,14 @@ module.exports = function (sequelize, DataTypes) {
     userId: {
       type: DataTypes.STRING,
       allowNull: false,
-      primaryKey: true // references: {
-      //   model: User,
-      //   key: 'id'
+      primaryKey: true // references:{
+      //   model:User,
+      //   key:'id'
       // }
 
-    } // primaryKey(productId,userId), 
-
+    },
+    // primaryKey(productId,userId),
+    quantity: DataTypes.INTEGER
   });
-  return Saved;
+  return Cart;
 };

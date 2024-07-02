@@ -12,11 +12,7 @@ module.exports = (sequelize, DataTypes) => {
     published:{
       type: DataTypes.BOOLEAN,
       defaultValue:false
-    },
-    // userId:DataTypes.INTEGER
-  })
-  Category.associate = models => {
-    Category.belongsTo(models.User)
-  }//this does not work
+    }, 
+  }) 
   return Category
 } 

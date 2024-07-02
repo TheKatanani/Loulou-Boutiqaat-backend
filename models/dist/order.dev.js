@@ -4,7 +4,12 @@ module.exports = function (sequelize, DataTypes) {
   var Order = sequelize.define('order', {
     userId: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false // references: {
+      //   model: User,
+      //   key: 'id',
+      //   deferrable:Deferrable.INITIALLY_IMMEDIATE
+      // }
+
     },
     orders: {
       type: DataTypes.JSON,

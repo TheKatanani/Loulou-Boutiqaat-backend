@@ -1,5 +1,9 @@
 "use strict";
 
+var db = require(".");
+
+var Category = db.category;
+
 module.exports = function (sequelize, DataTypes) {
   var Product = sequelize.define('product', {
     name: {
@@ -26,7 +30,11 @@ module.exports = function (sequelize, DataTypes) {
     description: DataTypes.TEXT,
     categoryId: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false // references: {
+      //   model: Category,
+      //   key: 'id'
+      // }
+
     },
     published: {
       type: DataTypes.BOOLEAN,

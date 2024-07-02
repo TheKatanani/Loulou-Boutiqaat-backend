@@ -1,9 +1,44 @@
+const {
+  Op
+} = require('sequelize')
 const db = require('../models')
 const Product = db.products
 const getProducts = async (req, res) => {
+  const {
+    name_like,
+    categoryId
+  } = req.query
+  console.log(name_like)
+  console.log(categoryId)
   try {
-    let products = await Product.findAll()
-    let newProducts = products.map(product => {
+    let products
+    if (categoryId && name_like) {
+      products = await Product.findAll({
+        where: {
+          name: {
+            [Op.substring]: name_like,
+          },
+          categoryId
+        }
+      })
+    } else if (categoryId) {
+      products = await Product.findAll({
+        where: { 
+          categoryId
+        }
+      })
+    } else if (name_like) {
+      products = await Product.findAll({
+        where: {
+          name: {
+            [Op.substring]: name_like,
+          } 
+        }
+      })
+    } else {
+      products = await Product.findAll()
+    }
+    let newProducts = products?.map(product => {
       product.images = JSON.parse(product.images)
       return product
     })
