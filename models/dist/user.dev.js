@@ -1,7 +1,7 @@
 "use strict";
 
 module.exports = function (sequelize, DataTypes) {
-  var User = sequelize.define('user', {
+  var User = sequelize.define('User', {
     name: {
       type: DataTypes.STRING,
       alowNall: false,
@@ -29,7 +29,21 @@ module.exports = function (sequelize, DataTypes) {
   });
 
   User.associate = function (models) {
-    Category.hasMany(models.Category);
+    User.hasMany(models.Order, {
+      foreignKey: 'userId',
+      targetKey: 'id',
+      as: 'order'
+    });
+    User.hasMany(models.Cart, {
+      foreignKey: 'userId',
+      targetKey: 'id',
+      as: 'car'
+    });
+    User.hasMany(models.Saved, {
+      foreignKey: 'userId',
+      targetKey: 'id',
+      as: 'saved'
+    });
   };
 
   return User;

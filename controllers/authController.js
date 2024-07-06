@@ -20,13 +20,14 @@ const loginHandler = async (req, res) => {
       }
     })
     if (!foundUser) {
-      res.status(401).json({
+        return res.status(401).json({
         message: 'This User Does Not Have An Account!'
       })
     }
-    const match = await bcrypt.compare(password, foundUser?.password)
+    const match = await bcrypt.compare(password, foundUser?.password) 
     if (match) {
       const roles = Object.values(JSON.parse(foundUser.roles))
+      console.log(roles)
       // create the JWTs 
       const accessToken = jwt.sign({
           userInfo: {
@@ -36,14 +37,14 @@ const loginHandler = async (req, res) => {
           }
         },
         process.env.ACCESS_TOKEN_SECRET, {
-          expiresIn: '15m'
+          expiresIn: '30m'
         }
       )
       const refreshToken = jwt.sign({
           name: foundUser.name
         },
         process.env.REFRESH_TOKEN_SECRET, {
-          expiresIn: '1d'
+          expiresIn: '10d'
         }
       )
       await User.update({

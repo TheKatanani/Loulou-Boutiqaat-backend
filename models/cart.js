@@ -1,29 +1,38 @@
 const db = require(".")
 
-const Product = db.products
-const User = db.users
 module.exports = (sequelize, DataTypes) => {
   const Cart = sequelize.define('cart', {
     productId: {
-      type: DataTypes.STRING,
+      type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true,
-      // references: {
-      //   model: Product,
-      //   key: 'id'
-      // }
+      references: {
+        model: 'products',
+        key: 'id'
+      }
     },
     userId: {
-      type: DataTypes.STRING,
+      type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true,
-      // references:{
-      //   model:User,
-      //   key:'id'
-      // }
+      references:{
+        model:'users',
+        key:'id'
+      }
     },
-    // primaryKey(productId,userId),
     quantity: DataTypes.INTEGER
   })
+  Cart.associate = function (models) {
+    Cart.belongsTo(models.Product, {
+      foreignKey: 'productId',
+      targetKey:'id',
+      as: 'product'  
+    });
+    Cart.belongsTo(models.User, {
+      foreignKey: 'userId',
+      targetKey:'id',
+      as: 'user' 
+    });
+  };
   return Cart
 }

@@ -1,5 +1,5 @@
 module.exports = (sequelize, DataTypes) => {
-  const User = sequelize.define('user', {
+  const User = sequelize.define('User', {
     name: {
       type: DataTypes.STRING,
       alowNall: false,
@@ -11,9 +11,9 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       unique: true
     },
-    password:{
-      type:DataTypes.STRING,
-      require:true
+    password: {
+      type: DataTypes.STRING,
+      require: true
     },
     barthDay: DataTypes.STRING,
     gender: {
@@ -25,8 +25,22 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     freezetableName: true,
   })
-  User.associate = models => {
-    Category.hasMany(models.Category)
-  }
+  User.associate = function (models) {
+    User.hasMany(models.Order, {
+      foreignKey: 'userId',
+      targetKey:'id',
+      as: 'order'
+    });
+    User.hasMany(models.Cart, {
+      foreignKey: 'userId',
+      targetKey:'id',
+      as: 'car'
+    });
+    User.hasMany(models.Saved, {
+      foreignKey: 'userId',
+      targetKey:'id',
+      as: 'saved'
+    });
+  };
   return User;
 }

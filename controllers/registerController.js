@@ -11,7 +11,7 @@ const createUser = async (req, res) => {
     "gender": req.body?.gender,
     "barthDay": req.body?.barthDay,
     "roles": {
-      User: ROLES_LIST.User
+      USER: ROLES_LIST.USER
     }
   } //new user
   // you must add validation here  

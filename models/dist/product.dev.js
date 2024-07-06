@@ -5,7 +5,7 @@ var db = require(".");
 var Category = db.category;
 
 module.exports = function (sequelize, DataTypes) {
-  var Product = sequelize.define('product', {
+  var Product = sequelize.define('Product', {
     name: {
       type: DataTypes.STRING,
       allowNull: false
@@ -29,17 +29,36 @@ module.exports = function (sequelize, DataTypes) {
     },
     description: DataTypes.TEXT,
     categoryId: {
-      type: DataTypes.STRING,
-      allowNull: false // references: {
-      //   model: Category,
-      //   key: 'id'
-      // }
-
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'categories',
+        key: 'id'
+      }
     },
     published: {
       type: DataTypes.BOOLEAN,
       defaultVaule: false
     }
   });
+
+  Product.associate = function (models) {
+    Product.belongsTo(models.Category, {
+      foreignKey: 'categoryId',
+      targetKey: 'id',
+      as: 'category'
+    });
+    Product.hasMany(models.Cart, {
+      foreignKey: 'productId',
+      targetKey: 'id',
+      as: 'car'
+    });
+    Product.hasMany(models.Saved, {
+      foreignKey: 'productId',
+      targetKey: 'id',
+      as: 'saved'
+    });
+  };
+
   return Product;
 };

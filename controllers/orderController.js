@@ -1,5 +1,5 @@
 const db = require('../models')
-const Order = db.order
+const Order = db.order 
 const getOrders = async (req, res) => {
   try {
     let orders = await Order.findAll()

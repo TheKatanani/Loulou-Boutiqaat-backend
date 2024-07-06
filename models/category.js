@@ -1,7 +1,5 @@
-const db = require(".")
-
 module.exports = (sequelize, DataTypes) => {
-  const Category = sequelize.define('category', {
+  const Category = sequelize.define('Category', {
     name: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -14,5 +12,12 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue:false
     }, 
   }) 
+  Category.associate = function (models) {
+    Category.hasMany(models.Product, {
+      foreignKey: 'categoryId',
+      targetKey:'id',
+      as: 'products'
+    });
+  };
   return Category
 } 

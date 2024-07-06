@@ -1,14 +1,15 @@
 const db = require("../models")
 const User = db.users
 const bcrypt = require('bcrypt')
-
+const Order = db.order
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
       attributes: {
         exclude: ['refreshToken']
-      }
+      },
     })
+    console.log(1)
     let newUsers = users.map(user => {
       user.roles = JSON.parse(user.roles)
       return user
@@ -16,7 +17,7 @@ const getAllUsers = async (req, res) => {
     res.status(200).json(newUsers)
   } catch (err) {
     res.status(400).json({
-      message: `Users Not Found! `
+      message: err
     })
   }
 }
@@ -130,7 +131,7 @@ const deleteUser = async (req, res) => {
     }
   } catch (err) {
     res.status(400).json({
-      message: `Something Went Wrong!` 
+      message: `Something Went Wrong!`
     })
   }
 }

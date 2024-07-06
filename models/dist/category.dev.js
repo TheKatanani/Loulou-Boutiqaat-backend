@@ -1,9 +1,7 @@
 "use strict";
 
-var db = require(".");
-
 module.exports = function (sequelize, DataTypes) {
-  var Category = sequelize.define('category', {
+  var Category = sequelize.define('Category', {
     name: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -16,5 +14,14 @@ module.exports = function (sequelize, DataTypes) {
       defaultValue: false
     }
   });
+
+  Category.associate = function (models) {
+    Category.hasMany(models.Product, {
+      foreignKey: 'categoryId',
+      targetKey: 'id',
+      as: 'products'
+    });
+  };
+
   return Category;
 };
