@@ -1,7 +1,7 @@
+const ROLES_LIST = require("../config/roles_list")
 const db = require("../models")
 const User = db.users
 const bcrypt = require('bcrypt')
-const Order = db.order
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
@@ -72,7 +72,7 @@ const createUser = async (req, res) => {
 }
 const updateUser = async (req, res) => {
   const id = req.params.id
-  const user = req.body //new user
+  const user = req.body
   try {
     const foundedUser = await User.findOne({
       where: {
@@ -80,15 +80,19 @@ const updateUser = async (req, res) => {
       }
     })
     if (foundedUser) {
+      if (user?.password) {
+        const newPassword = await bcrypt.hash(user?.password, 10)
+        user.password = newPassword
+      }
       const updatedUser = {
         name: foundedUser.name,
         phone: foundedUser.phone,
         password: foundedUser.password,
         gender: foundedUser.gender,
         barthDay: foundedUser.barthDay,
-        roles: foundedUser.roles,
+        roles: JSON.parse(foundedUser.roles),
         ...user
-      } //new user  
+      }
       await User.update(updatedUser, {
         where: {
           id
@@ -97,11 +101,74 @@ const updateUser = async (req, res) => {
       res.json(updatedUser)
     } else {
       res.status(404).json({
-        message: `User ID ${req.params.id} Is Not Found! `
+        message: `User ID ${id} Is Not Found! `
       })
     }
   } catch (err) {
-    res.json({
+    res.status(400).json({
+      message: err
+    })
+  }
+}
+const updateUserInfo = async (req, res) => {
+  const id = req.id
+  const user = req.body.user
+  const password = req.body.password
+  const role = req.roles
+  try {
+    const foundedUser = await User.findOne({
+      where: {
+        id
+      }
+    })
+    if (foundedUser) {
+
+      if (role !== ROLES_LIST.ADMIN) {
+        delete user?.roles
+      }
+      const match = await bcrypt.compare(password, foundedUser?.password)
+      // const match = password === foundedUser?.password
+      if (match) {
+        if(user.password){
+          if (user.password?.length >= 6) {
+            const newPassword = await bcrypt.hash(user?.password, 10)
+            user.password = newPassword
+          } else {
+            return res.status(400).json({
+              message: "the password must be more than 6 characters"
+            })
+          }
+        }
+        const updatedUser = {
+          name: foundedUser.name,
+          phone: foundedUser.phone,
+          password: foundedUser.password,
+          gender: foundedUser.gender,
+          barthDay: foundedUser.barthDay,
+          roles: JSON.parse(foundedUser.roles),
+          ...user
+        }
+        await User.update(updatedUser, {
+          where: {
+            id
+          }
+        })
+        res.json(updatedUser)
+      } else {
+        res.status(400).json({
+          message: `Wrong Password!`
+        })
+      }
+
+    } else {
+      console.log(8)
+      res.status(404).json({
+        message: `User ID ${id} Is Not Found! `
+      })
+    }
+  } catch (err) {
+    console.log(9)
+    res.status(400).json({
       message: err
     })
   }
@@ -139,6 +206,7 @@ module.exports = {
   getAllUsers,
   getUser,
   createUser,
+  updateUserInfo,
   updateUser,
   deleteUser
 }

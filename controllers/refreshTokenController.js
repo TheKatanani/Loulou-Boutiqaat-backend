@@ -18,7 +18,7 @@ const handleRefreshToken = async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET,
       (err, decoded) => {
         if (err) return res.sendStatus(403)
-        const roles = Object.values(JSON.parse(foundUser?.roles)) 
+        const roles = Object.values(JSON.parse(foundUser?.roles))[0]  
         const accessToken = jwt.sign({
             userInfo: {
               name: foundUser.name,// || decoded.userInfo.name
@@ -39,7 +39,7 @@ const handleRefreshToken = async (req, res) => {
             phone: foundUser?.phone,
             barthDay: foundUser?.barthDay,
             gender: foundUser?.gender,
-            role: roles?.length && roles[0] && roles[0] 
+            role: roles 
           }
         })
       }

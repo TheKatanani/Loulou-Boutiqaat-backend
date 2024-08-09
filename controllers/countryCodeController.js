@@ -1,10 +1,10 @@
 const db = require('../models')
 const CountryCode = db.countryCode
 const getCountryCode = async (req, res) => {
-  try{
+  try {
     let categories = await CountryCode.findAll()
     res.status(200).send(categories)
-  }catch (err){
+  } catch (err) {
     res.status(400).json({
       message: err
     })
@@ -13,8 +13,8 @@ const getCountryCode = async (req, res) => {
 const addCountryCode = async (req, res) => {
   const id = req.id
   let info = {
-    label: req.body?.label, 
-    value: req.body?.value, 
+    label: req.body?.label,
+    value: req.body?.value,
   }
   try {
     const countryCode = await CountryCode.create(info, {
@@ -23,7 +23,7 @@ const addCountryCode = async (req, res) => {
       }
     })
     res.status(201).json({
-      success: `${countryCode.label} Phone Added Successfolly!`
+      success: `${countryCode.label} Phone Added successfully!`
     })
   } catch (err) {
     res.status(400).json({
@@ -32,21 +32,21 @@ const addCountryCode = async (req, res) => {
   }
 }
 const updateCountryCode = async (req, res) => {
-  const id = req.params.id 
+  const id = req.params.id
   try {
     const foundedItem = await CountryCode.findOne({
-      where: { 
+      where: {
         id
       }
     })
-    if (foundedItem) { 
+    if (foundedItem) {
       await CountryCode.update(req.body, {
-        where: { 
+        where: {
           id
         }
       })
       res.json({
-        success: `Country Code Updated Successfolly!`
+        success: `Country Code Updated successfully!`
       })
     } else {
       res.status(404).json({
@@ -60,28 +60,28 @@ const updateCountryCode = async (req, res) => {
   }
 }
 const deleteCountryCode = async (req, res) => {
-  const id = req.params.id 
+  const id = req.params.id
   try {
     const foundedItem = await CountryCode.findOne({
-      where: { 
+      where: {
         id
       }
     })
-    if(foundedItem){ 
+    if (foundedItem) {
       await CountryCode.destroy({
         where: {
-          id 
+          id
         }
       })
       res.status(200).json({
         message: 'Country Code is deleted!'
       })
-    }else {
+    } else {
       res.status(404).json({
         message: 'Country Code is not found!'
       })
     }
-  }catch (err){
+  } catch (err) {
     res.json({
       message: err
     })

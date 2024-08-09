@@ -10,7 +10,7 @@ const getSavedItems = async (req, res) => {
       },
       attributes: ["productId"]
     })
-    const saved = savedItems.map(el => el.productId) 
+    const saved = savedItems.map(el => el.productId)
     res.status(200).json({
       data: saved,
       userId: id
@@ -44,30 +44,30 @@ const uploadLocalSaved = async (req, res) => {
   const {
     localSaved
   } = req.body
-  try {  
+  try {
     localSaved?.map(async (productId) => {
-      const founded =await Saved.findOne({
-        where:{
+      const founded = await Saved.findOne({
+        where: {
           productId,
           userId
         }
-      }) 
+      })
       let item = {
         productId,
         userId,
-      } 
-      if (founded) { 
+      }
+      if (founded) {
         await Saved.update(item, {
           where: {
             userId,
-            productId 
+            productId
           }
         })
-      } else { 
+      } else {
         await Saved.create(item)
       }
-    }) 
-    res.sendStatus(201) 
+    })
+    res.sendStatus(201)
   } catch (err) {
     res.status(400).json({
       message: err
@@ -112,7 +112,7 @@ const clearSaved = async (req, res) => {
       }
     })
     res.json({
-      success: `Clear saved Successfolly!`
+      success: `Clear saved successfully!`
     })
 
   } catch (err) {

@@ -28,30 +28,30 @@ const uploadLocalCart = async (req, res) => {
   const {
     localCart
   } = req.body
-  try {  
+  try {
     localCart?.map(async (item) => {
-      const founded =await Cart.findOne({
-        where:{
-          productId:item.productId,
+      const founded = await Cart.findOne({
+        where: {
+          productId: item.productId,
           userId
         }
-      }) 
+      })
       item = {
         ...item,
         userId,
-      } 
-      if (founded) { 
+      }
+      if (founded) {
         await Cart.update(item, {
           where: {
             userId,
             productId: item.productId
           }
         })
-      } else { 
+      } else {
         await Cart.create(item)
       }
-    }) 
-    res.sendStatus(201) 
+    })
+    res.sendStatus(201)
   } catch (err) {
     res.status(400).json({
       message: err
@@ -119,7 +119,7 @@ const clearCart = async (req, res) => {
       }
     })
     res.json({
-      success: `Clear Cart Successfolly!`
+      success: `Clear Cart successfully!`
     })
 
   } catch (err) {

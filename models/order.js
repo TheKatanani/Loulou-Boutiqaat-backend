@@ -19,7 +19,11 @@ module.exports = (sequelize, DataTypes) => {
     },
     totalCost: DataTypes.INTEGER,
     paid: DataTypes.INTEGER,
-    location: DataTypes.STRING
+    location: DataTypes.STRING,
+    status:{
+      type:DataTypes.BOOLEAN,
+      defaultValue:false
+    }
   }, {});
 
   Order.associate = function (models) {

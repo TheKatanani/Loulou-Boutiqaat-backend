@@ -6,7 +6,7 @@ const User = db.users
 const loginHandler = async (req, res) => {
   const {
     phone,
-    password
+    password,
   } = req.body
   if (!phone || !password) {
     res.status(400).json({
@@ -20,14 +20,14 @@ const loginHandler = async (req, res) => {
       }
     })
     if (!foundUser) {
-        return res.status(401).json({
+      return res.status(401).json({
         message: 'This User Does Not Have An Account!'
       })
     }
-    const match = await bcrypt.compare(password, foundUser?.password) 
+    const match = await bcrypt.compare(password, foundUser?.password)
+    // const match =  password=== foundUser?.password 
     if (match) {
-      const roles = Object.values(JSON.parse(foundUser.roles))
-      console.log(roles)
+      const roles = Object.values(JSON.parse(foundUser.roles))[0]
       // create the JWTs 
       const accessToken = jwt.sign({
           userInfo: {
@@ -63,13 +63,13 @@ const loginHandler = async (req, res) => {
       res.json({
         accessToken,
         user: {
-          id:foundUser?.id, 
+          id: foundUser?.id,
           name: foundUser?.name,
           password: foundUser?.password,
           phone: foundUser?.phone,
           barthDay: foundUser?.barthDay,
           gender: foundUser?.gender,
-          role: roles?.length && roles[0] && roles[0] //send the user role code 
+          role: roles //send the user role code 
         }
       })
     } else {

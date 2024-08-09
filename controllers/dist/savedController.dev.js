@@ -44,7 +44,9 @@ var getSavedItems = function getSavedItems(req, res) {
           return _context.stop();
       }
     }
-  }, null, null, [[1, 9]]);
+  }, null, null, [
+    [1, 9]
+  ]);
 };
 
 var addToSaved = function addToSaved(req, res) {
@@ -80,7 +82,9 @@ var addToSaved = function addToSaved(req, res) {
           return _context2.stop();
       }
     }
-  }, null, null, [[3, 9]]);
+  }, null, null, [
+    [3, 9]
+  ]);
 };
 
 var deleteFromSaved = function deleteFromSaved(req, res) {
@@ -142,7 +146,9 @@ var deleteFromSaved = function deleteFromSaved(req, res) {
           return _context3.stop();
       }
     }
-  }, null, null, [[2, 15]]);
+  }, null, null, [
+    [2, 15]
+  ]);
 };
 
 var clearSaved = function clearSaved(req, res) {
@@ -162,7 +168,7 @@ var clearSaved = function clearSaved(req, res) {
 
         case 4:
           res.json({
-            success: "Clear saved Successfolly!"
+            success: "Clear saved successfully!"
           });
           _context4.next = 10;
           break;
@@ -179,7 +185,9 @@ var clearSaved = function clearSaved(req, res) {
           return _context4.stop();
       }
     }
-  }, null, null, [[1, 7]]);
+  }, null, null, [
+    [1, 7]
+  ]);
 };
 
 module.exports = {
