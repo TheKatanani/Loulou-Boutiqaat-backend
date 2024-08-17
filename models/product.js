@@ -14,11 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     prevPrice:{
       type:DataTypes.INTEGER,
       defaultVaule:0
-    },
-    count:{
-      type:DataTypes.INTEGER,
-      defaultVaule:0
-    },
+    }, 
     images: DataTypes.JSON,  
     stars: {
       type:DataTypes.INTEGER,

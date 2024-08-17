@@ -7,7 +7,7 @@ module.exports = function (sequelize, DataTypes) {
       allowNull: false,
       unique: true
     },
-    description: DataTypes.TEXT,
+    description: DataTypes.TEXT('long'),
     background: DataTypes.TEXT,
     published: {
       type: DataTypes.BOOLEAN,

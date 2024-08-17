@@ -14,15 +14,7 @@ var sequelize = new Sequelize(dbConfig.DATABASE, dbConfig.USER, dbConfig.PASSWOR
     ecquire: dbConfig.pool.ecquire,
     idle: dbConfig.pool.idle
   }
-}); // (async() =>{
-//   try {
-//     await sequelize.authenticate();
-//     console.log('Connection has been established successfully.');
-//   } catch (error) {
-//     console.error('Unable to connect to the database:', error);
-//   }
-// })()
-
+});
 var db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;

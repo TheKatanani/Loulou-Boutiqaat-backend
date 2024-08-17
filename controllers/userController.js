@@ -8,8 +8,7 @@ const getAllUsers = async (req, res) => {
       attributes: {
         exclude: ['refreshToken']
       },
-    })
-    console.log(1)
+    }) 
     let newUsers = users.map(user => {
       user.roles = JSON.parse(user.roles)
       return user
@@ -160,14 +159,12 @@ const updateUserInfo = async (req, res) => {
         })
       }
 
-    } else {
-      console.log(8)
+    } else { 
       res.status(404).json({
         message: `User ID ${id} Is Not Found! `
       })
     }
-  } catch (err) {
-    console.log(9)
+  } catch (err) { 
     res.status(400).json({
       message: err
     })

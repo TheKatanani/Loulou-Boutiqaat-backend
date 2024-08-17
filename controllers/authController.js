@@ -10,7 +10,7 @@ const loginHandler = async (req, res) => {
   } = req.body
   if (!phone || !password) {
     res.status(400).json({
-      message: 'phone and password are required!'
+      message: 'الهاتف وكلمة المرور مطلوبة!'
     })
   }
   try {
@@ -21,7 +21,7 @@ const loginHandler = async (req, res) => {
     })
     if (!foundUser) {
       return res.status(401).json({
-        message: 'This User Does Not Have An Account!'
+        message: 'هذا المستخدم ليس لديه حساب!'
       })
     }
     const match = await bcrypt.compare(password, foundUser?.password)
@@ -74,7 +74,7 @@ const loginHandler = async (req, res) => {
       })
     } else {
       res.status(400).json({
-        message: 'Wrong Password!'
+        message: 'كلمة المرور خاطئة!'
       })
     }
   } catch (err) {

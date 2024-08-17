@@ -23,12 +23,12 @@ const createUser = async (req, res) => {
   if (isExist) {
     res.status(409) //conflict 
       .json({
-        message: `This User With ${user.phone} Phone Has An Account`
+        message: `هذا المستخدم الذي يحمل رقم الهاتف ${user.phone} لديه حساب`
       })
   } else {
     if (!user.phone || !user.password) {
       res.status(400).json({
-        message: `Phone and Password are requried`
+        message: `الهاتف وكلمة المرور مطلوبان`
       })
     }
     try {
@@ -36,7 +36,7 @@ const createUser = async (req, res) => {
       user.password = newPassword
       await User.create(user)
       res.status(201).json({
-        success: `new user ${user.name} created!`
+        success: `تم إنشاء المستخدم الجديد ${user.name}!`
       })
     } catch (err) {
       res.json({

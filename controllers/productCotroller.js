@@ -7,9 +7,7 @@ const getProducts = async (req, res) => {
   const {
     name_like,
     categoryId
-  } = req.query
-  console.log(name_like)
-  console.log(categoryId)
+  } = req.query 
   try {
     let products
     if (categoryId && name_like) {
@@ -55,8 +53,7 @@ const addProduct = async (req, res) => {
     description: req.body?.description,
     price: req.body?.price,
     images: req.body?.images,
-    prevPrice: req.body?.prevPrice,
-    count: req.body?.count,
+    prevPrice: req.body?.prevPrice, 
     stars: req.body?.stars,
     categoryId: req.body?.categoryId,
     published: req.body?.published || false

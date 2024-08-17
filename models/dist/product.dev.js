@@ -18,10 +18,6 @@ module.exports = function (sequelize, DataTypes) {
       type: DataTypes.INTEGER,
       defaultVaule: 0
     },
-    count: {
-      type: DataTypes.INTEGER,
-      defaultVaule: 0
-    },
     images: DataTypes.JSON,
     stars: {
       type: DataTypes.INTEGER,

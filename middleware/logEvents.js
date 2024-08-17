@@ -9,8 +9,7 @@ const {
 } = require('uuid')
 const logEvents = async (message, logName) => {
   const dateTime = `${format(new Date(),'yyyyMMdd\tHH:mm:ss')}`
-  const logItem = `${dateTime}\t${v4()}\t${message}`
-  // console.log(logItem)
+  const logItem = `${dateTime}\t${v4()}\t${message}` 
   try {
     if (!fs.existsSync(path.join(__dirname, 'logs'))) {
       await fsPromises.mkdir(path.join(__dirname, 'logs'))
