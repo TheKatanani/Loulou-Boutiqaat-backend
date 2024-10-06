@@ -86,6 +86,33 @@ const deleteOrder = async (req, res) => {
     })
   }
 }
+const cancelOrder = async (req, res) => {
+  const orderId = req.params.id
+  const userId = req.id 
+  try {
+    const foundedOrder = await Order.findOne({
+      where: {
+        id:orderId
+      }
+    }) 
+    if (foundedOrder && foundedOrder.userId == userId) {
+      await Order.destroy({
+        where: {
+          id:orderId
+        }
+      })
+      res.status(200).json(orderId)
+    } else {
+      res.status(404).json({
+        message: 'order is not found!'
+      })
+    }
+  } catch (err) {
+    res.status(400).json({
+      message: err
+    })
+  }
+}
 const getOrder = async (req, res) => {
   const id = req.params.id
   try {
@@ -109,4 +136,5 @@ module.exports = {
   getOrder,
   updateOrder,
   deleteOrder,
+  cancelOrder
 }

@@ -207,15 +207,75 @@ var deleteOrder = function deleteOrder(req, res) {
   }, null, null, [[1, 14]]);
 };
 
-var getOrder = function getOrder(req, res) {
-  var id, order;
-  return regeneratorRuntime.async(function getOrder$(_context5) {
+var cancelOrder = function cancelOrder(req, res) {
+  var orderId, userId, foundedOrder;
+  return regeneratorRuntime.async(function cancelOrder$(_context5) {
     while (1) {
       switch (_context5.prev = _context5.next) {
         case 0:
+          orderId = req.params.id;
+          userId = req.id;
+          _context5.prev = 2;
+          _context5.next = 5;
+          return regeneratorRuntime.awrap(Order.findOne({
+            where: {
+              id: orderId
+            }
+          }));
+
+        case 5:
+          foundedOrder = _context5.sent;
+
+          if (!(foundedOrder && foundedOrder.userId == userId)) {
+            _context5.next = 12;
+            break;
+          }
+
+          _context5.next = 9;
+          return regeneratorRuntime.awrap(Order.destroy({
+            where: {
+              id: orderId
+            }
+          }));
+
+        case 9:
+          res.status(200).json(orderId);
+          _context5.next = 13;
+          break;
+
+        case 12:
+          res.status(404).json({
+            message: 'order is not found!'
+          });
+
+        case 13:
+          _context5.next = 18;
+          break;
+
+        case 15:
+          _context5.prev = 15;
+          _context5.t0 = _context5["catch"](2);
+          res.status(400).json({
+            message: _context5.t0
+          });
+
+        case 18:
+        case "end":
+          return _context5.stop();
+      }
+    }
+  }, null, null, [[2, 15]]);
+};
+
+var getOrder = function getOrder(req, res) {
+  var id, order;
+  return regeneratorRuntime.async(function getOrder$(_context6) {
+    while (1) {
+      switch (_context6.prev = _context6.next) {
+        case 0:
           id = req.params.id;
-          _context5.prev = 1;
-          _context5.next = 4;
+          _context6.prev = 1;
+          _context6.next = 4;
           return regeneratorRuntime.awrap(Order.findOne({
             where: {
               id: id
@@ -223,22 +283,22 @@ var getOrder = function getOrder(req, res) {
           }));
 
         case 4:
-          order = _context5.sent;
+          order = _context6.sent;
           order.orders = JSON.parse(order.orders);
           res.status(200).json(order);
-          _context5.next = 12;
+          _context6.next = 12;
           break;
 
         case 9:
-          _context5.prev = 9;
-          _context5.t0 = _context5["catch"](1);
+          _context6.prev = 9;
+          _context6.t0 = _context6["catch"](1);
           res.status(400).json({
-            message: _context5.t0
+            message: _context6.t0
           });
 
         case 12:
         case "end":
-          return _context5.stop();
+          return _context6.stop();
       }
     }
   }, null, null, [[1, 9]]);
@@ -249,5 +309,6 @@ module.exports = {
   getOrders: getOrders,
   getOrder: getOrder,
   updateOrder: updateOrder,
-  deleteOrder: deleteOrder
+  deleteOrder: deleteOrder,
+  cancelOrder: cancelOrder
 };
