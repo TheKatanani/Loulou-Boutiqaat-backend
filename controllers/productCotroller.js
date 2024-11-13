@@ -123,7 +123,7 @@ const deleteProduct = async (req, res) => {
       })
     }
   } catch (err) {
-    res.json({
+    res.status(400).json({
       message: err
     })
   }
