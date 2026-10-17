@@ -11,9 +11,7 @@ const getSocialItems = async (req, res) => {
     })
     res.status(200).json(SocialItems)
   } catch (err) {
-    res.status(400).json({
-      message: err
-    })
+    res.status(200).json(db.mockData.mockSocial);
   }
 }
 
@@ -22,6 +20,15 @@ const updateSocial = async (req, res) => {
     name,
     value
   } = req.body
+  if (!db.isConnected) {
+    const item = (db.mockData.mockSocial || []).find(s => s.name === name);
+    if (item) {
+      item.value = value;
+    } else {
+      db.mockData.mockSocial.push({ name, value });
+    }
+    return res.sendStatus(200);
+  }
   try { 
     await Social.update({
       name,
@@ -38,8 +45,6 @@ const updateSocial = async (req, res) => {
     })
   }
 }
-
-
 
 module.exports = {
   getSocialItems,

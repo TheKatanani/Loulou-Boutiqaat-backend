@@ -22,18 +22,34 @@ const formatOrder = (order) => {
 };
 
 const getOrders = async (req, res) => {
+  if (!db.isConnected) {
+    const list = (db.mockData.mockOrders || []).map(formatOrder);
+    return res.status(200).send(list);
+  }
   try {
     let orders = await Order.findAll()
     let newOrders = (orders || []).map(formatOrder);
     res.status(200).send(newOrders)
   } catch (err) {
-    res.status(400).json({
-      message: err?.message || err
-    })
+    const list = (db.mockData.mockOrders || []).map(formatOrder);
+    res.status(200).send(list)
   }
 }
+
 const addOrder = async (req, res) => {
   const userId = req.id
+  if (!db.isConnected) {
+    const maxId = (db.mockData.mockOrders || []).reduce((max, o) => Math.max(max, o.id || 0), 100);
+    const newOrder = {
+      id: maxId + 1,
+      ...req.body,
+      userId: userId || 1,
+      status: false,
+      createdAt: new Date().toISOString()
+    };
+    db.mockData.mockOrders.unshift(newOrder);
+    return res.status(201).json(formatOrder(newOrder));
+  }
   try {
     const order = await Order.create({
       ...req.body,
@@ -46,8 +62,17 @@ const addOrder = async (req, res) => {
     })
   }
 }
+
 const updateOrder = async (req, res) => {
   const id = req.params.id
+  if (!db.isConnected) {
+    const index = (db.mockData.mockOrders || []).findIndex(o => o.id == id);
+    if (index === -1) {
+      return res.status(404).json({ message: 'can not found this order!' });
+    }
+    db.mockData.mockOrders[index] = { ...db.mockData.mockOrders[index], ...req.body };
+    return res.json(formatOrder(db.mockData.mockOrders[index]));
+  }
   try {
     const foundedItem = await Order.findOne({
       where: {
@@ -77,8 +102,17 @@ const updateOrder = async (req, res) => {
     })
   }
 }
+
 const deleteOrder = async (req, res) => {
   const id = req.params.id
+  if (!db.isConnected) {
+    const index = (db.mockData.mockOrders || []).findIndex(o => o.id == id);
+    if (index === -1) {
+      return res.status(404).json({ message: 'order is not found!' });
+    }
+    db.mockData.mockOrders.splice(index, 1);
+    return res.status(200).json(Number(id));
+  }
   try {
     const foundedItem = await Order.findOne({
       where: {
@@ -91,7 +125,7 @@ const deleteOrder = async (req, res) => {
           id
         }
       })
-      res.status(200).json(id)
+      res.status(200).json(Number(id))
     } else {
       res.status(404).json({
         message: 'order is not found!'
@@ -103,9 +137,18 @@ const deleteOrder = async (req, res) => {
     })
   }
 }
+
 const cancelOrder = async (req, res) => {
   const orderId = req.params.id
   const userId = req.id 
+  if (!db.isConnected) {
+    const index = (db.mockData.mockOrders || []).findIndex(o => o.id == orderId);
+    if (index === -1) {
+      return res.status(404).json({ message: 'order is not found!' });
+    }
+    db.mockData.mockOrders.splice(index, 1);
+    return res.status(200).json(Number(orderId));
+  }
   try {
     const foundedOrder = await Order.findOne({
       where: {
@@ -130,8 +173,14 @@ const cancelOrder = async (req, res) => {
     })
   }
 }
+
 const getOrder = async (req, res) => {
   const id = req.params.id
+  if (!db.isConnected) {
+    const order = (db.mockData.mockOrders || []).find(o => o.id == id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    return res.status(200).json(formatOrder(order));
+  }
   try {
     let order = await Order.findOne({
       where: {

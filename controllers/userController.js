@@ -23,6 +23,10 @@ const sanitizeUser = (user) => {
 };
 
 const getAllUsers = async (req, res) => {
+  if (!db.isConnected) {
+    const list = (db.mockData.mockUsers || []).map(sanitizeUser);
+    return res.status(200).json(list);
+  }
   try {
     const users = await User.findAll({
       attributes: {
@@ -32,13 +36,18 @@ const getAllUsers = async (req, res) => {
     let newUsers = (users || []).map(sanitizeUser);
     res.status(200).json(newUsers)
   } catch (err) {
-    res.status(400).json({
-      message: err?.message || err
-    })
+    const list = (db.mockData.mockUsers || []).map(sanitizeUser);
+    res.status(200).json(list)
   }
 }
+
 const getUser = async (req, res) => {
   const id = req.params.id
+  if (!db.isConnected) {
+    const user = (db.mockData.mockUsers || []).find(u => u.id == id);
+    if (user) return res.json({ user: sanitizeUser(user) });
+    return res.status(404).json({ message: `User ID ${id} Is Not Found!` });
+  }
   try {
     const user = await User.findOne({
       where: {
@@ -60,14 +69,27 @@ const getUser = async (req, res) => {
     })
   }
 }
+
 const createUser = async (req, res) => {
   const user = {
     name: req.body?.name,
     phone: req.body?.phone,
     password: req.body?.password,
-    gender: req.body?.gender,
-    barthDay: req.body?.barthDay,
+    gender: req.body?.gender || 'female',
+    barthDay: req.body?.barthDay || '2000-01-01',
     roles: req.body?.roles || { USER: 2001 }
+  }
+  if (!db.isConnected) {
+    const isExist = (db.mockData.mockUsers || []).find(u => u.phone === user.phone);
+    if (isExist) {
+      return res.status(409).json({
+        message: `المستخدم صاحب الرقم ${user.phone} مسجل بالفعل`
+      });
+    }
+    const maxId = (db.mockData.mockUsers || []).reduce((max, u) => Math.max(max, u.id || 0), 0);
+    const newUser = { id: maxId + 1, ...user };
+    db.mockData.mockUsers.push(newUser);
+    return res.status(201).json(sanitizeUser(newUser));
   }
   try {
     const isExist = await User.findOne({
@@ -90,9 +112,18 @@ const createUser = async (req, res) => {
     })
   }
 }
+
 const updateUser = async (req, res) => {
   const id = req.params.id
   const user = req.body
+  if (!db.isConnected) {
+    const index = (db.mockData.mockUsers || []).findIndex(u => u.id == id);
+    if (index === -1) {
+      return res.status(404).json({ message: `User ID ${id} Is Not Found!` });
+    }
+    db.mockData.mockUsers[index] = { ...db.mockData.mockUsers[index], ...user };
+    return res.json(sanitizeUser(db.mockData.mockUsers[index]));
+  }
   try {
     const foundedUser = await User.findOne({
       where: {
@@ -130,11 +161,18 @@ const updateUser = async (req, res) => {
     })
   }
 }
+
 const updateUserInfo = async (req, res) => {
   const id = req.id
   const user = req.body.user
   const password = req.body.password
   const role = req.roles
+  if (!db.isConnected) {
+    const index = (db.mockData.mockUsers || []).findIndex(u => u.id == id);
+    if (index === -1) return res.status(404).json({ message: `User ID ${id} Is Not Found!` });
+    db.mockData.mockUsers[index] = { ...db.mockData.mockUsers[index], ...user };
+    return res.json(sanitizeUser(db.mockData.mockUsers[index]));
+  }
   try {
     const foundedUser = await User.findOne({
       where: {
@@ -142,12 +180,10 @@ const updateUserInfo = async (req, res) => {
       }
     })
     if (foundedUser) {
-
       if (role !== ROLES_LIST.ADMIN) {
         delete user?.roles
       }
       const match = await bcrypt.compare(password, foundedUser?.password)
-      // const match = password === foundedUser?.password
       if (match) {
         if(user.password){
           if (user.password?.length >= 6) {
@@ -179,7 +215,6 @@ const updateUserInfo = async (req, res) => {
           message: `Wrong Password!`
         })
       }
-
     } else { 
       res.status(404).json({
         message: `User ID ${id} Is Not Found! `
@@ -187,14 +222,20 @@ const updateUserInfo = async (req, res) => {
     }
   } catch (err) { 
     res.status(400).json({
-      message: err
+      message: err?.message || err
     })
   }
 }
+
 const deleteUser = async (req, res) => {
   const id = req.params.id
+  if (!db.isConnected) {
+    const index = (db.mockData.mockUsers || []).findIndex(u => u.id == id);
+    if (index === -1) return res.status(404).json({ message: `User ID ${id} Is Not Found!` });
+    db.mockData.mockUsers.splice(index, 1);
+    return res.json(Number(id));
+  }
   try {
-
     const foundedUser = await User.findOne({
       where: {
         id
@@ -206,9 +247,7 @@ const deleteUser = async (req, res) => {
           id
         }
       })
-      res.json({
-        success: `the user with ID:${id} was deleted!`
-      })
+      res.json(Number(id))
     } else {
       res.status(400).json({
         message: `User ID ${req.params.id} Is Not Found!`
@@ -220,6 +259,7 @@ const deleteUser = async (req, res) => {
     })
   }
 }
+
 module.exports = {
   getAllUsers,
   getUser,

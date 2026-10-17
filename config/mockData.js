@@ -206,7 +206,45 @@ const mockUsers = [
 
 const mockCart = [];
 const mockSaved = [];
-const mockOrders = [];
+const mockOrders = [
+  {
+    id: 101,
+    userId: 3,
+    orders: [
+      { productId: 1, quantity: 1 },
+      { productId: 8, quantity: 1 }
+    ],
+    totalCost: 540,
+    paid: 0,
+    location: 'رام الله - حي الطيرة',
+    status: false,
+    createdAt: '2026-10-17T11:30:00.000Z'
+  },
+  {
+    id: 102,
+    userId: 2,
+    orders: [
+      { productId: 5, quantity: 1 }
+    ],
+    totalCost: 180,
+    paid: 1,
+    location: 'غزة - شارع عمر المختار',
+    status: true,
+    createdAt: '2026-10-16T15:20:00.000Z'
+  },
+  {
+    id: 103,
+    userId: 3,
+    orders: [
+      { productId: 4, quantity: 2 }
+    ],
+    totalCost: 440,
+    paid: 1,
+    location: 'نابلس - شارع رفيديا',
+    status: false,
+    createdAt: '2026-10-17T14:10:00.000Z'
+  }
+];
 
 module.exports = {
   mockCategories,
