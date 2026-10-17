@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: loulou-boutiqaat-backend
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://thekatanani.com,https://www.thekatanani.com,http://localhost:3000

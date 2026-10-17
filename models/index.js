@@ -1,17 +1,46 @@
 const dbConfig = require('../config/dbConfig.js')
 const Sequelize = require('sequelize')
-const sequelize = new Sequelize(dbConfig.DATABASE, dbConfig.USER, dbConfig.PASSWORD, {
-  host: dbConfig.HOST,
-  port: dbConfig.PORT || 3306,
-  dialect: dbConfig.DIALECT,
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
-  pool: {
-    max: dbConfig.pool.max,
-    min: dbConfig.pool.min,
-    acquire: dbConfig.pool.acquire || 30000,
-    idle: dbConfig.pool.idle, 
-  }
-}) 
+
+const useSsl = process.env.DB_SSL === 'true' || (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('ssl'));
+
+let sequelize;
+if (process.env.DATABASE_URL) {
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    dialectOptions: useSsl ? {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    } : {},
+    pool: {
+      max: dbConfig.pool.max,
+      min: dbConfig.pool.min,
+      acquire: dbConfig.pool.acquire || 30000,
+      idle: dbConfig.pool.idle, 
+    }
+  });
+} else {
+  sequelize = new Sequelize(dbConfig.DATABASE, dbConfig.USER, dbConfig.PASSWORD, {
+    host: dbConfig.HOST,
+    port: dbConfig.PORT || 3306,
+    dialect: dbConfig.DIALECT,
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    dialectOptions: useSsl ? {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    } : {},
+    pool: {
+      max: dbConfig.pool.max,
+      min: dbConfig.pool.min,
+      acquire: dbConfig.pool.acquire || 30000,
+      idle: dbConfig.pool.idle, 
+    }
+  });
+}
+
 const db = {}
 db.Sequelize = Sequelize
 db.sequelize = sequelize
@@ -56,7 +85,7 @@ async function test() {
     db.isConnected = true;
   } catch (error) {
     db.isConnected = false;
-    console.warn('MySQL not detected on localhost:3306. Operating in Mock Fallback Mode.');
+    console.warn(`Database connection notice: ${error.message}. Operating in Mock Fallback Mode.`);
   }
 }
 test()

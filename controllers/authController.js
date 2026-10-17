@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const db = require('../models')
+const { getCookieOptions } = require('../config/cookieConfig')
 require('dotenv').config()
 const User = db.users
 
@@ -34,12 +35,7 @@ const loginHandler = async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET || 'loulou_refresh_token_secret_default_key_2026',
       { expiresIn: '10d' }
     );
-    res.cookie('jwt', refreshToken, {
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-      sameSite: 'Lax',
-      secure: false
-    });
+    res.cookie('jwt', refreshToken, getCookieOptions());
     return res.json({
       accessToken,
       user: {
@@ -101,12 +97,7 @@ const loginHandler = async (req, res) => {
           phone
         }
       })
-      res.cookie('jwt', refreshToken, {
-        httpOnly: true, // not available to js 
-        maxAge: 24 * 60 * 60 * 1000, // one day 
-        sameSite: 'Lax',
-        secure: process.env.NODE_ENV === 'production'
-      })
+      res.cookie('jwt', refreshToken, getCookieOptions());
       return res.json({
         accessToken,
         user: {

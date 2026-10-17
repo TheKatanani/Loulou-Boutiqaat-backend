@@ -1,45 +1,40 @@
 const db = require('../models')
+const { getClearCookieOptions } = require('../config/cookieConfig')
 const User = db.users
-
 
 const logoutHandler = async (req, res) => { 
   const cookies = req.cookies 
-  if (!cookies?.jwt) return res.sendStatus(401) // unauthorized
+  if (!cookies?.jwt) return res.sendStatus(204) // No content
 
   const refreshToken = cookies.jwt
+
+  if (!db.isConnected) {
+    res.clearCookie('jwt', getClearCookieOptions())
+    return res.sendStatus(204)
+  }
+
   try {
-    const foundUser =await User.findOne({
+    const foundUser = await User.findOne({
       where: {
         refreshToken
       }
     })
     if (!foundUser) {
-      res.clearCookie('jwt', {
-        httpOnly: true,
-        // secure: true,
-        // sameSite: 'None'
-      }) //you must add the same option you send with
-      // maxAge does not needed on clear cookies
-      return res.status(204)
+      res.clearCookie('jwt', getClearCookieOptions())
+      return res.sendStatus(204)
     } 
-    User.update({
+    await User.update({
       refreshToken: ''
     }, {
       where: {
         id: foundUser?.id
       }
     })
-    res.clearCookie('jwt', {
-      httpOnly: true,
-      // sameSite: 'None',
-      // secure: true
-    }) // on production add secure:true - only serves on https
-
+    res.clearCookie('jwt', getClearCookieOptions())
     res.sendStatus(204)
   } catch (err) {
-    res.status(400).json({
-      message: err
-    })
+    res.clearCookie('jwt', getClearCookieOptions())
+    res.sendStatus(204)
   }
 }
 

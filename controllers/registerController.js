@@ -2,6 +2,7 @@ require('dotenv').config()
 const bcrypt = require('bcryptjs')
 const ROLES_LIST = require('../config/roles_list')
 const jwt = require('jsonwebtoken')
+const { getCookieOptions } = require('../config/cookieConfig')
 
 const db = require('../models')
 const User = db.users
@@ -74,12 +75,7 @@ const createUser = async (req, res) => {
       }
     )  
 
-    res.cookie('jwt', refreshToken, {
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-      sameSite: 'Lax',
-      secure: process.env.NODE_ENV === 'production'
-    })
+    res.cookie('jwt', refreshToken, getCookieOptions())
 
     return res.status(201).json({
       accessToken,

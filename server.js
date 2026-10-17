@@ -18,6 +18,9 @@ const credentials = require('./middleware/credentials.js')
 const app = express()
 const PORT = process.env.PORT || 3500
 
+// Required on Render / reverse proxies for secure cross-site cookies & accurate client IP
+app.set('trust proxy', 1)
+
 // Custom request logger
 app.use(logger)
 
@@ -33,14 +36,20 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Middleware for cookies
 app.use(cookieParser())
-// app.use(cors({
-//   origin:'http://localhost:3001',
-//   allowHeaders:['Authorization'],
-//   credentials:true,
-//   methods:['GET','POST','PUT','DELETE']
-// })) 
 
 app.use(express.static(path.join(__dirname, '/public')))
+
+// Health check endpoint for Render zero-downtime deployments and monitoring
+app.get('/health', (req, res) => {
+  const db = require('./models');
+  res.status(200).json({
+    status: 'ok',
+    service: 'Loulou Boutiqaat API',
+    uptime: Math.floor(process.uptime()),
+    database: db.isConnected ? 'connected' : 'mock-fallback',
+    timestamp: new Date().toISOString()
+  });
+});
 
 app.use('^/$', require('./router/root.js'))
 
@@ -54,14 +63,13 @@ app.use('/product', require('./router/api/product.js'))
 app.use('/countryCode', require('./router/api/countryCode.js'))
 app.use('/category', require('./router/api/category.js'))
 app.use('/social', require('./router/api/social.js'))
-//any route under this line must verify by jwt
+
+// Any route under this line must verify by JWT
 app.use(verifyJWT)
 app.use('/users', require('./router/api/users'))
 app.use('/cart', require('./router/api/cart.js'))
 app.use('/saved', require('./router/api/saved.js'))
 app.use('/order', require('./router/api/order.js'))
-
-
 
 app.all('*', (req, res) => {
   res.status(404)
@@ -78,7 +86,6 @@ app.all('*', (req, res) => {
 
 app.use(errorHandler)
 
-
-app.listen(PORT, () => {
-  console.log(`app listing on port ${PORT}`)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Loulou Boutiqaat backend listening on 0.0.0.0:${PORT}`)
 })
