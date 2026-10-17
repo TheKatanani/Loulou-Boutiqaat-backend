@@ -157,4 +157,5 @@ pnpm start
 ## 👨‍💻 المطور (Developer)
 
 - **محمد قطناني (Mohammed Katanani)**
+- Website: [thekatanani.com](https://thekatanani.com)
 - GitHub: [@TheKatanani](https://github.com/TheKatanani)
