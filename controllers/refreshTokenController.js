@@ -15,27 +15,34 @@ const handleRefreshToken = async (req, res) => {
     if (!foundUser) return res.sendStatus(403) //forbidden
     jwt.verify(
       refreshToken,
-      process.env.REFRESH_TOKEN_SECRET,
+      process.env.REFRESH_TOKEN_SECRET || 'loulou_refresh_token_secret_default_key_2026',
       (err, decoded) => {
         if (err) return res.sendStatus(403)
-        const roles = Object.values(JSON.parse(foundUser?.roles))[0]  
+        let roles;
+        try {
+          const rawRoles = foundUser?.roles;
+          const parsed = typeof rawRoles === 'string' ? JSON.parse(rawRoles) : rawRoles;
+          roles = typeof parsed === 'object' && parsed !== null ? Object.values(parsed)[0] : parsed;
+        } catch (e) {
+          roles = 2001;
+        }
+
         const accessToken = jwt.sign({
             userInfo: {
-              name: foundUser.name,// || decoded.userInfo.name
+              name: foundUser.name,
               roles,
               id: foundUser.id
             }
           },
-          process.env.ACCESS_TOKEN_SECRET, {
+          process.env.ACCESS_TOKEN_SECRET || 'loulou_access_token_secret_default_key_2026', {
             expiresIn: '30m'
           }
         )
-        res.json({
+        return res.json({
           accessToken,
           user: {
-            id:foundUser?.id, 
+            id: foundUser?.id, 
             name: foundUser?.name,
-            password: foundUser?.password,
             phone: foundUser?.phone,
             barthDay: foundUser?.barthDay,
             gender: foundUser?.gender,

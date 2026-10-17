@@ -8,15 +8,16 @@ const {
   v4
 } = require('uuid')
 const logEvents = async (message, logName) => {
-  const dateTime = `${format(new Date(),'yyyyMMdd\tHH:mm:ss')}`
-  const logItem = `${dateTime}\t${v4()}\t${message}` 
+  const dateTime = `${format(new Date(), 'yyyyMMdd\tHH:mm:ss')}`
+  const logItem = `${dateTime}\t${v4()}\t${message}\n` 
   try {
-    if (!fs.existsSync(path.join(__dirname, 'logs'))) {
-      await fsPromises.mkdir(path.join(__dirname, 'logs'))
+    const logsDir = path.join(__dirname, '..', 'logs');
+    if (!fs.existsSync(logsDir)) {
+      await fsPromises.mkdir(logsDir, { recursive: true });
     }
-    await fsPromises.appendFile(path.join(__dirname, 'logs', logName), logItem) //create file if not exist
+    await fsPromises.appendFile(path.join(logsDir, logName), logItem);
   } catch (err) {
-    console.log(err.message)
+    console.log(err.message);
   }
 }
 const logger = (req, res, next) => {

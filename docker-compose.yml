@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: loulou_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: loulouboutiqaat
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  backend:
+    build: .
+    container_name: loulou_backend
+    restart: always
+    ports:
+      - "3500:3500"
+    environment:
+      PORT: 3500
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: loulouboutiqaat
+      ACCESS_TOKEN_SECRET: loulou_super_secret_access_token_key_2026_boutiqaat
+      REFRESH_TOKEN_SECRET: loulou_super_secret_refresh_token_key_2026_boutiqaat
+    depends_on:
+      - mysql
+
+volumes:
+  mysql_data:

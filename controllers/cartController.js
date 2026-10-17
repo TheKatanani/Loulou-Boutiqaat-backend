@@ -6,6 +6,12 @@ const Cart = db.cart
 
 const getCartItems = async (req, res) => {
   const userId = req.id
+  if (!db.isConnected) {
+    return res.status(200).json({
+      data: db.mockData.mockCart,
+      userId
+    })
+  }
   try {
     const cartItems = await Cart.findAll({
       where: {
@@ -29,32 +35,34 @@ const uploadLocalCart = async (req, res) => {
     localCart
   } = req.body
   try {
-    localCart?.map(async (item) => {
-      const founded = await Cart.findOne({
-        where: {
-          productId: item.productId,
-          userId
-        }
-      })
-      item = {
-        ...item,
-        userId,
-      }
-      if (founded) {
-        await Cart.update(item, {
+    if (Array.isArray(localCart)) {
+      for (let item of localCart) {
+        const founded = await Cart.findOne({
           where: {
-            userId,
-            productId: item.productId
+            productId: item.productId,
+            userId
           }
         })
-      } else {
-        await Cart.create(item)
+        const cartData = {
+          ...item,
+          userId,
+        }
+        if (founded) {
+          await Cart.update(cartData, {
+            where: {
+              userId,
+              productId: item.productId
+            }
+          })
+        } else {
+          await Cart.create(cartData)
+        }
       }
-    })
+    }
     res.sendStatus(201)
   } catch (err) {
     res.status(400).json({
-      message: err
+      message: err?.message || err
     })
   }
 }

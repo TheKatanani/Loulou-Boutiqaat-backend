@@ -1,16 +1,34 @@
 const db = require('../models')
 const Order = db.order 
+
+const parseOrders = (orders) => {
+  if (!orders) return [];
+  if (Array.isArray(orders) || typeof orders === 'object') return orders;
+  if (typeof orders === 'string') {
+    try {
+      return JSON.parse(orders);
+    } catch (e) {
+      return orders;
+    }
+  }
+  return orders;
+};
+
+const formatOrder = (order) => {
+  if (!order) return order;
+  const o = order.dataValues ? { ...order.dataValues } : { ...order };
+  o.orders = parseOrders(o.orders);
+  return o;
+};
+
 const getOrders = async (req, res) => {
   try {
     let orders = await Order.findAll()
-    let newOrders = orders.map(order => {
-      order.orders = JSON.parse(order.orders)
-      return order
-    })
+    let newOrders = (orders || []).map(formatOrder);
     res.status(200).send(newOrders)
   } catch (err) {
     res.status(400).json({
-      message: err
+      message: err?.message || err
     })
   }
 }
@@ -21,10 +39,10 @@ const addOrder = async (req, res) => {
       ...req.body,
       userId
     })
-    res.status(201).json(order)
+    res.status(201).json(formatOrder(order))
   } catch (err) {
     res.status(400).json({
-      message: err
+      message: err?.message || err
     })
   }
 }
@@ -47,8 +65,7 @@ const updateOrder = async (req, res) => {
           id
         }
       })
-      order.orders = JSON.parse(order.orders)
-      res.json(order)
+      res.json(formatOrder(order))
     } else {
       res.status(404).json({
         message: `can not found this order!`
@@ -56,7 +73,7 @@ const updateOrder = async (req, res) => {
     }
   } catch (err) {
     res.status(400).json({
-      message: err
+      message: err?.message || err
     })
   }
 }
@@ -81,8 +98,8 @@ const deleteOrder = async (req, res) => {
       })
     }
   } catch (err) {
-    res.json({
-      message: err
+    res.status(400).json({
+      message: err?.message || err
     })
   }
 }
@@ -109,7 +126,7 @@ const cancelOrder = async (req, res) => {
     }
   } catch (err) {
     res.status(400).json({
-      message: err
+      message: err?.message || err
     })
   }
 }
@@ -121,11 +138,15 @@ const getOrder = async (req, res) => {
         id
       }
     })
-    order.orders = JSON.parse(order.orders)
-    res.status(200).json(order)
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found'
+      })
+    }
+    res.status(200).json(formatOrder(order))
   } catch (err) {
     res.status(400).json({
-      message: err
+      message: err?.message || err
     })
   }
 }

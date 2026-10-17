@@ -1,6 +1,3 @@
-const db = require(".")
-
-const Category = db.category
 module.exports = (sequelize, DataTypes) => {
   const Product = sequelize.define('Product', {
     name: {
@@ -9,29 +6,29 @@ module.exports = (sequelize, DataTypes) => {
     },
     price:{
       type:DataTypes.INTEGER,
-      defaultVaule:0
+      defaultValue:0
     },
     prevPrice:{
       type:DataTypes.INTEGER,
-      defaultVaule:0
+      defaultValue:0
     }, 
     images: DataTypes.JSON,  
     stars: {
       type:DataTypes.INTEGER,
-      defaultVaule:1
+      defaultValue:1
     },
     description: DataTypes.TEXT, 
     categoryId:{
       type:DataTypes.INTEGER,
       allowNull:false,
       references: {
-        model: 'categories',
+        model: 'Categories',
         key: 'id'
       } 
     },
     published: {
       type:DataTypes.BOOLEAN,
-      defaultVaule:false
+      defaultValue:false
     },
   }) 
   Product.associate = function (models) {

@@ -1,6 +1,9 @@
 const db = require('../models')
 const Category = db.category
 const getCategorys = async (req, res) => {
+  if (!db.isConnected) {
+    return res.status(200).send(db.mockData.mockCategories);
+  }
   try {
     let categories = await Category.findAll()
     res.status(200).send(categories)
@@ -82,6 +85,9 @@ const deleteCategory = async (req, res) => {
 }
 
 const getPublishedCategorys = async (req, res) => {
+  if (!db.isConnected) {
+    return res.status(200).send(db.mockData.mockCategories.filter(c => c.published));
+  }
   try {
     let categorys = await Category.findAll({
       where: {

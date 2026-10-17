@@ -3,6 +3,12 @@ const Saved = db.saved
 
 const getSavedItems = async (req, res) => {
   const id = req.id
+  if (!db.isConnected) {
+    return res.status(200).json({
+      data: db.mockData.mockSaved,
+      userId: id
+    })
+  }
   try {
     const savedItems = await Saved.findAll({
       where: {

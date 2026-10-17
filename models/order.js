@@ -1,8 +1,3 @@
-const db = require(".");
-
-// Assuming you have defined your User model like this:
-const User = db.users;
-
 module.exports = (sequelize, DataTypes) => {
   const Order = sequelize.define('Order', {
     userId: {

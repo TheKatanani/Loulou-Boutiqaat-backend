@@ -2,7 +2,7 @@ module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define('User', {
     name: {
       type: DataTypes.STRING,
-      alowNall: false,
+      allowNull: false,
       validate: {
         notEmpty: true
       }
@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     password: {
       type: DataTypes.STRING,
-      require: true
+      allowNull: false
     },
     barthDay: DataTypes.STRING,
     gender: {
@@ -23,7 +23,7 @@ module.exports = (sequelize, DataTypes) => {
     roles: DataTypes.JSON,
     refreshToken: DataTypes.STRING
   }, {
-    freezetableName: true,
+    freezeTableName: true,
   })
   User.associate = function (models) {
     User.hasMany(models.Order, {

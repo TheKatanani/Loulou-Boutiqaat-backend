@@ -1,6 +1,9 @@
 const db = require('../models')
 const CountryCode = db.countryCode
 const getCountryCode = async (req, res) => {
+  if (!db.isConnected) {
+    return res.status(200).send(db.mockData.mockCountryCodes);
+  }
   try {
     let categories = await CountryCode.findAll()
     res.status(200).send(categories)

@@ -2,6 +2,9 @@ const db = require("../models")
 const Social = db.social
 
 const getSocialItems = async (req, res) => {
+  if (!db.isConnected) {
+    return res.status(200).json(db.mockData.mockSocial);
+  }
   try {
     const SocialItems = await Social.findAll({
       attributes: ["name", "value"]

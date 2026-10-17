@@ -1,7 +1,7 @@
+require('dotenv').config();
 const express = require('express')
 const path = require('path')
 const cors = require('cors')
-const bodyParser = require("body-parser");
 const {
   errorHandler
 } = require('./middleware/errorHandler')
@@ -18,23 +18,21 @@ const credentials = require('./middleware/credentials.js')
 const app = express()
 const PORT = process.env.PORT || 3500
 
-app.use(bodyParser.json({
-  estended:true,limit:'50mb'
-}));
+// Custom request logger
+app.use(logger)
 
-// middleware to handle urlencoded form data
-app.use(express.urlencoded({
-  extended: false
-}))
-// middleware for cookies
-app.use(express.json())
-
-// middleware for cookies
-app.use(cookieParser())
-
+// Handle options credentials check before CORS! and fetch cookies credentials requirement
 app.use(credentials)
-//cross origin resourse sharing 
+
+// Cross origin resource sharing
 app.use(cors(corsOptions))
+
+// Middleware to handle urlencoded and json data (built into Express)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Middleware for cookies
+app.use(cookieParser())
 // app.use(cors({
 //   origin:'http://localhost:3001',
 //   allowHeaders:['Authorization'],
@@ -65,7 +63,6 @@ app.use('/order', require('./router/api/order.js'))
 
 
 
-app.use(logger) //DOES NOT WORK
 app.all('*', (req, res) => {
   res.status(404)
   if (req.accepts('html')) {

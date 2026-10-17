@@ -8,14 +8,14 @@ const verifyJWT = (req, res, next) => {
   const token = authHeader.split(' ')[1] // bearer token
   jwt.verify(
     token,
-    process.env.ACCESS_TOKEN_SECRET,
+    process.env.ACCESS_TOKEN_SECRET || 'loulou_access_token_secret_default_key_2026',
     (err, decoded) => { //decoded information from jwt 
       if (err) return res.status(403).json({
-        message: err
+        message: err.message || 'Forbidden'
       }) //invalid token  
-      req.user = decoded.userInfo?.name,
-      req.roles = decoded.userInfo?.roles
-      req.id = decoded.userInfo?.id
+      req.user = decoded.userInfo?.name;
+      req.roles = decoded.userInfo?.roles;
+      req.id = decoded.userInfo?.id;
       next();
     }
   )
