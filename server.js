@@ -63,6 +63,7 @@ app.use('/product', require('./router/api/product.js'))
 app.use('/countryCode', require('./router/api/countryCode.js'))
 app.use('/category', require('./router/api/category.js'))
 app.use('/social', require('./router/api/social.js'))
+app.use('/catalog', require('./router/api/catalog.js'))
 
 // Any route under this line must verify by JWT
 app.use(verifyJWT)
