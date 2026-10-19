@@ -34,6 +34,23 @@ const getCatalogProducts = async () => {
   }
 };
 
+const sanitizeCdata = (str) => {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .replace(/\]\]>/g, ']]&gt;');
+};
+
+const escapeXml = (unsafe) => {
+  if (!unsafe) return '';
+  return String(unsafe)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+};
+
 // 1. Meta / Facebook / WhatsApp XML RSS Feed
 router.get('/facebook-feed.xml', async (req, res) => {
   try {
@@ -43,27 +60,30 @@ router.get('/facebook-feed.xml', async (req, res) => {
     let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
   <channel>
-    <title>Loulou Boutiqaat - كتالوج لولو بوتيكات</title>
-    <link>${siteUrl}</link>
-    <description>كتالوج متجر لولو بوتيكات للعطور الفاخرة ومستحضرات التجميل والأزياء الراقية</description>
+    <title><![CDATA[Loulou Boutiqaat - كتالوج لولو بوتيكات]]></title>
+    <link>${escapeXml(siteUrl)}</link>
+    <description><![CDATA[كتالوج متجر لولو بوتيكات للعطور الفاخرة ومستحضرات التجميل والأزياء الراقية]]></description>
 `;
 
     products.forEach((p) => {
       const images = parseImages(p.images);
       const mainImg = images[0] || 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=800';
-      const cleanDesc = (p.description || p.name).replace(/[<>&"]/g, '');
-      const cleanTitle = p.name.replace(/[<>&"]/g, '');
+      const cleanDesc = sanitizeCdata(p.description || p.name);
+      const cleanTitle = sanitizeCdata(p.name);
+      const priceNum = Number(p.price) || 0;
+      const formattedPrice = `${priceNum.toFixed(2)} ILS`;
+      const productLink = `${siteUrl}/home/products/${p.id}`;
 
       xml += `    <item>
       <g:id>${p.id}</g:id>
       <g:title><![CDATA[${cleanTitle}]]></g:title>
       <g:description><![CDATA[${cleanDesc}]]></g:description>
-      <g:link>${siteUrl}/home/products/${p.id}</g:link>
-      <g:image_link>${mainImg}</g:image_link>
-      <g:brand>Loulou Boutiqaat</g:brand>
+      <g:link>${escapeXml(productLink)}</g:link>
+      <g:image_link>${escapeXml(mainImg)}</g:image_link>
+      <g:brand><![CDATA[Loulou Boutiqaat]]></g:brand>
       <g:condition>new</g:condition>
       <g:availability>in stock</g:availability>
-      <g:price>${p.price} ILS</g:price>
+      <g:price>${formattedPrice}</g:price>
       <g:inventory>50</g:inventory>
     </item>
 `;
