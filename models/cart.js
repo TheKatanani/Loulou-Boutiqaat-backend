@@ -1,5 +1,3 @@
-const db = require(".")
-
 module.exports = (sequelize, DataTypes) => {
   const Cart = sequelize.define('cart', {
     productId: {
@@ -7,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       primaryKey: true,
       references: {
-        model: 'products',
+        model: 'Products',
         key: 'id'
       }
     },
@@ -15,24 +13,26 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true,
-      references:{
-        model:'users',
-        key:'id'
+      references: {
+        model: 'User',
+        key: 'id'
       }
     },
     quantity: DataTypes.INTEGER
-  })
+  });
+
   Cart.associate = function (models) {
     Cart.belongsTo(models.Product, {
       foreignKey: 'productId',
-      targetKey:'id',
+      targetKey: 'id',
       as: 'product'  
     });
     Cart.belongsTo(models.User, {
       foreignKey: 'userId',
-      targetKey:'id',
+      targetKey: 'id',
       as: 'user' 
     });
   };
-  return Cart
-}
+
+  return Cart;
+};

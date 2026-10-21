@@ -1,18 +1,30 @@
-const dbConfig = require('../config/dbConfig.js')
-const Sequelize = require('sequelize')
+const dbConfig = require('../config/dbConfig.js');
+const Sequelize = require('sequelize');
 
-const useSsl = process.env.DB_SSL === 'true' || (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('ssl'));
+let rawUrl = process.env.DATABASE_URL || '';
+let cleanUrl = rawUrl;
+const isTidbOrSsl = process.env.DB_SSL === 'true' || 
+  rawUrl.includes('ssl') || 
+  rawUrl.includes('tidbcloud.com') ||
+  (dbConfig.HOST && dbConfig.HOST.includes('tidbcloud.com'));
+
+if (cleanUrl && cleanUrl.includes('?')) {
+  // Strip query string like ?ssl=true to avoid mysql2 "Unknown SSL profile" error
+  cleanUrl = cleanUrl.split('?')[0];
+}
+
+const sslOptions = isTidbOrSsl ? {
+  ssl: {
+    minVersion: 'TLSv1.2',
+    rejectUnauthorized: false
+  }
+} : {};
 
 let sequelize;
-if (process.env.DATABASE_URL) {
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
+if (cleanUrl) {
+  sequelize = new Sequelize(cleanUrl, {
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    dialectOptions: useSsl ? {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    } : {},
+    dialectOptions: sslOptions,
     pool: {
       max: dbConfig.pool.max,
       min: dbConfig.pool.min,
@@ -26,12 +38,7 @@ if (process.env.DATABASE_URL) {
     port: dbConfig.PORT || 3306,
     dialect: dbConfig.DIALECT,
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    dialectOptions: useSsl ? {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    } : {},
+    dialectOptions: sslOptions,
     pool: {
       max: dbConfig.pool.max,
       min: dbConfig.pool.min,
@@ -41,50 +48,41 @@ if (process.env.DATABASE_URL) {
   });
 }
 
-const db = {}
-db.Sequelize = Sequelize
-db.sequelize = sequelize
-db.users = require('./user.js')(sequelize, Sequelize.DataTypes)
-db.products = require('./product.js')(sequelize, Sequelize.DataTypes)
-db.cart = require('./cart.js')(sequelize, Sequelize.DataTypes)
-db.saved = require('./saved.js')(sequelize, Sequelize.DataTypes)
-db.category = require('./category.js')(sequelize, Sequelize.DataTypes)
-db.countryCode = require('./countryCode.js')(sequelize, Sequelize.DataTypes)
-db.social = require('./social.js')(sequelize, Sequelize.DataTypes)
-db.order = require('./order.js')(sequelize, Sequelize.DataTypes)
+const db = {};
+db.Sequelize = Sequelize;
+db.sequelize = sequelize;
+db.users = require('./user.js')(sequelize, Sequelize.DataTypes);
+db.products = require('./product.js')(sequelize, Sequelize.DataTypes);
+db.cart = require('./cart.js')(sequelize, Sequelize.DataTypes);
+db.saved = require('./saved.js')(sequelize, Sequelize.DataTypes);
+db.category = require('./category.js')(sequelize, Sequelize.DataTypes);
+db.countryCode = require('./countryCode.js')(sequelize, Sequelize.DataTypes);
+db.social = require('./social.js')(sequelize, Sequelize.DataTypes);
+db.order = require('./order.js')(sequelize, Sequelize.DataTypes);
 
 // Map capitalized names so model associations (e.g. models.Category, models.Product) resolve correctly
-db.User = db.users
-db.Product = db.products
-db.Cart = db.cart
-db.Saved = db.saved
-db.Category = db.category
-db.CountryCode = db.countryCode
-db.Social = db.social
-db.Order = db.order
+db.User = db.users;
+db.Product = db.products;
+db.Cart = db.cart;
+db.Saved = db.saved;
+db.Category = db.category;
+db.CountryCode = db.countryCode;
+db.Social = db.social;
+db.Order = db.order;
 
-// Invoke associations once per model
-const modelList = [db.users, db.products, db.cart, db.saved, db.category, db.countryCode, db.social, db.order];
-modelList.forEach((model) => {
-  if (model && typeof model.associate === 'function') {
+// Run model associations once per unique model definition
+const processedModels = new Set();
+Object.values(db).forEach((model) => {
+  if (model && typeof model.associate === 'function' && !processedModels.has(model)) {
+    processedModels.add(model);
     model.associate(db);
   }
 });
 
-db.isConnected = false
-db.mockData = require('../config/mockData')
+db.isConnected = false;
+db.mockData = require('../config/mockData');
 
-async function test() {
-  try {
-    await db.sequelize.authenticate();
-    console.log('Database connected successfully.');
-    await db.sequelize.sync({
-      force: false
-    });
-    console.log('Database synchronized.');
-    db.isConnected = true;
-    await ensureSchemaUpdates();
-async function ensureSchemaUpdates() {
+const ensureSchemaUpdates = async () => {
   const queryInterface = db.sequelize.getQueryInterface();
   try {
     const productDesc = await queryInterface.describeTable('Products').catch(() => null);
@@ -155,13 +153,23 @@ async function ensureSchemaUpdates() {
   } catch (e) {
     console.warn('Orders schema check:', e.message);
   }
-}
+};
 
+async function test() {
+  try {
+    await db.sequelize.authenticate();
+    console.log('Database connected successfully.');
+    await db.sequelize.sync({
+      force: false
+    });
+    console.log('Database synchronized.');
+    db.isConnected = true;
+    await ensureSchemaUpdates();
   } catch (error) {
     db.isConnected = false;
     console.warn(`Database connection notice: ${error.message}. Operating in Mock Fallback Mode.`);
   }
 }
-test()
+test();
 
-module.exports = db
+module.exports = db;

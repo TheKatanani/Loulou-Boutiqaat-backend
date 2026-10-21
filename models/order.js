@@ -4,7 +4,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true, // Nullable to support guest WhatsApp checkout
       references: {
-        model: 'users',
+        model: 'User',
         key: 'id',
       }
     },

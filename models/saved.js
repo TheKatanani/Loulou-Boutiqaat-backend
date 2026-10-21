@@ -5,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       primaryKey: true,
       references: {
-        model: 'products',
+        model: 'Products',
         key: 'id'
       }
     },
@@ -14,12 +14,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       primaryKey: true,
       references: {
-        model: 'users',
+        model: 'User',
         key: 'id'
       }
     },
-    // primaryKey(productId,userId), 
-  })
+  });
+
   Saved.associate = function (models) {
     Saved.belongsTo(models.Product, {
       foreignKey: 'productId',
@@ -31,6 +31,7 @@ module.exports = (sequelize, DataTypes) => {
       targetKey: 'id',
       as: 'user'
     });
-  }
-  return Saved
-}
+  };
+
+  return Saved;
+};
