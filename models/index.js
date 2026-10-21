@@ -89,7 +89,7 @@ const ensureSchemaUpdates = async () => {
     if (productDesc && !productDesc.stock) {
       await queryInterface.addColumn('Products', 'stock', {
         type: Sequelize.DataTypes.INTEGER,
-        defaultValue: 25,
+        defaultValue: 0,
         allowNull: false
       }).catch(err => console.warn('stock add column notice:', err.message));
       console.log('Added column stock to Products table.');
@@ -112,6 +112,13 @@ const ensureSchemaUpdates = async () => {
           type: Sequelize.DataTypes.STRING,
           allowNull: true
         }).catch(err => console.warn('orderCode notice:', err.message));
+      }
+      if (!orderDesc.idempotencyKey) {
+        await queryInterface.addColumn('Orders', 'idempotencyKey', {
+          type: Sequelize.DataTypes.STRING,
+          allowNull: true,
+          unique: true
+        }).catch(err => console.warn('idempotencyKey notice:', err.message));
       }
       if (!orderDesc.customerName) {
         await queryInterface.addColumn('Orders', 'customerName', {
@@ -136,6 +143,17 @@ const ensureSchemaUpdates = async () => {
           type: Sequelize.DataTypes.STRING,
           defaultValue: 'pending_whatsapp'
         }).catch(err => console.warn('orderStatus notice:', err.message));
+      }
+      if (!orderDesc.inventoryTracked) {
+        await queryInterface.addColumn('Orders', 'inventoryTracked', {
+          type: Sequelize.DataTypes.BOOLEAN,
+          defaultValue: true
+        }).catch(err => console.warn('inventoryTracked notice:', err.message));
+
+        // Mark pre-existing legacy orders as inventoryTracked = false to prevent phantom stock return
+        await db.sequelize.query(
+          "UPDATE `Orders` SET `inventoryTracked` = false, `orderStatus` = IF(`status` = 1, 'delivered', 'confirmed') WHERE `orderSource` IS NULL OR `orderSource` = 'web_auth'"
+        ).catch(err => console.warn('Legacy order migration notice:', err.message));
       }
       if (!orderDesc.expiresAt) {
         await queryInterface.addColumn('Orders', 'expiresAt', {

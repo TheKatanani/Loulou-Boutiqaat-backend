@@ -13,6 +13,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       unique: true
     },
+    idempotencyKey: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true
+    },
     orders: {
       type: DataTypes.JSON, // Contains historical snapshot of items [{ productId, name, price, quantity, subtotal }]
       allowNull: false,
@@ -35,6 +40,10 @@ module.exports = (sequelize, DataTypes) => {
     orderStatus: {
       type: DataTypes.STRING, // 'pending_whatsapp', 'confirmed', 'delivered', 'cancelled', 'expired'
       defaultValue: 'pending_whatsapp'
+    },
+    inventoryTracked: {
+      type: DataTypes.BOOLEAN, // True if inventory deduction was applied to this order
+      defaultValue: true
     },
     expiresAt: DataTypes.DATE, // 60 minutes reservation for WhatsApp drafts
     secretToken: DataTypes.STRING, // Secret token to resume/cancel draft without auth
