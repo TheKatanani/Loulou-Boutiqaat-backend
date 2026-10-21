@@ -4,50 +4,56 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    price:{
-      type:DataTypes.INTEGER,
-      defaultValue:0
+    price: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
     },
-    prevPrice:{
-      type:DataTypes.INTEGER,
-      defaultValue:0
+    prevPrice: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
     }, 
     images: DataTypes.JSON,  
     stars: {
-      type:DataTypes.INTEGER,
-      defaultValue:1
+      type: DataTypes.INTEGER,
+      defaultValue: 1
     },
     description: DataTypes.TEXT, 
-    categoryId:{
-      type:DataTypes.INTEGER,
-      allowNull:false,
+    categoryId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
       references: {
         model: 'Categories',
         key: 'id'
       } 
     },
     published: {
-      type:DataTypes.BOOLEAN,
-      defaultValue:false
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
     },
-  }) 
+    stock: {
+      type: DataTypes.INTEGER,
+      defaultValue: 25,
+      allowNull: false
+    }
+  });
+
   Product.associate = function (models) {
     Product.belongsTo(models.Category, {
       foreignKey: 'categoryId',
-      targetKey:'id',
+      targetKey: 'id',
       as: 'category'  
     });
     Product.hasMany(models.Cart, {
       foreignKey: 'productId',
-      targetKey:'id',
+      targetKey: 'id',
       as: 'car'
     });
     Product.hasMany(models.Saved, {
       foreignKey: 'productId',
-      targetKey:'id',
+      targetKey: 'id',
       as: 'saved'
     });
   };
-  return Product
-} 
 
+  return Product;
+};

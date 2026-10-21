@@ -58,19 +58,19 @@ app.use('/login', require('./router/auth'))
 app.use('/refresh', require('./router/refresh'))
 app.use('/logout', require('./router/logout'))
 
-// API
+// API (Public or self-handled authentication)
 app.use('/product', require('./router/api/product.js'))
 app.use('/countryCode', require('./router/api/countryCode.js'))
 app.use('/category', require('./router/api/category.js'))
 app.use('/social', require('./router/api/social.js'))
 app.use('/catalog', require('./router/api/catalog.js'))
+app.use('/order', require('./router/api/order.js'))
 
 // Any route under this line must verify by JWT
 app.use(verifyJWT)
 app.use('/users', require('./router/api/users'))
 app.use('/cart', require('./router/api/cart.js'))
 app.use('/saved', require('./router/api/saved.js'))
-app.use('/order', require('./router/api/order.js'))
 
 app.all('*', (req, res) => {
   res.status(404)
@@ -87,6 +87,13 @@ app.all('*', (req, res) => {
 
 app.use(errorHandler)
 
+const { cleanupExpiredDrafts } = require('./services/orderService')
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Loulou Boutiqaat backend listening on 0.0.0.0:${PORT}`)
+  // Initialize periodic draft cleanup (60-minute WhatsApp reservation expiration)
+  cleanupExpiredDrafts().catch((e) => console.error('Initial cleanup error:', e.message))
+  setInterval(() => {
+    cleanupExpiredDrafts().catch((e) => console.error('Interval cleanup error:', e.message))
+  }, 60 * 1000)
 })

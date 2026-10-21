@@ -1,31 +1,54 @@
 module.exports = (sequelize, DataTypes) => {
   const Order = sequelize.define('Order', {
     userId: {
-      type: DataTypes.INTEGER, // Assuming User ID is of type INTEGER
-      allowNull: false,
+      type: DataTypes.INTEGER,
+      allowNull: true, // Nullable to support guest WhatsApp checkout
       references: {
-        model: 'users', // This is the model you're referring to
-        key: 'id',   // This is the column name in the User model
+        model: 'users',
+        key: 'id',
       }
     },
+    orderCode: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true
+    },
     orders: {
-      type: DataTypes.JSON,
+      type: DataTypes.JSON, // Contains historical snapshot of items [{ productId, name, price, quantity, subtotal }]
       allowNull: false,
     },
-    totalCost: DataTypes.INTEGER,
-    paid: DataTypes.INTEGER,
+    totalCost: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
+    },
+    paid: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
+    },
     location: DataTypes.STRING,
-    status:{
-      type:DataTypes.BOOLEAN,
-      defaultValue:false
+    customerName: DataTypes.STRING,
+    customerPhone: DataTypes.STRING,
+    orderSource: {
+      type: DataTypes.STRING, // 'web_auth', 'whatsapp_draft', 'whatsapp_native'
+      defaultValue: 'web_auth'
+    },
+    orderStatus: {
+      type: DataTypes.STRING, // 'pending_whatsapp', 'confirmed', 'delivered', 'cancelled', 'expired'
+      defaultValue: 'pending_whatsapp'
+    },
+    expiresAt: DataTypes.DATE, // 60 minutes reservation for WhatsApp drafts
+    secretToken: DataTypes.STRING, // Secret token to resume/cancel draft without auth
+    status: {
+      type: DataTypes.BOOLEAN, // Backward compatibility: true if delivered, else false
+      defaultValue: false
     }
   }, {});
 
   Order.associate = function (models) {
     Order.belongsTo(models.User, {
       foreignKey: 'userId',
-      targetKey:'id',
-      as: 'user' // Alias for the relation
+      targetKey: 'id',
+      as: 'user'
     });
   };
 

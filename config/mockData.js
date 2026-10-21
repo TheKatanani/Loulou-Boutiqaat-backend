@@ -55,6 +55,7 @@ const mockProducts = [
     stars: 5,
     categoryId: 1,
     published: true,
+    stock: 25,
     images: [
       'https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1547887537-6158d64c35b3?auto=format&fit=crop&w=800&q=80'
@@ -69,6 +70,7 @@ const mockProducts = [
     stars: 5,
     categoryId: 1,
     published: true,
+    stock: 25,
     images: [
       'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=800&q=80'
     ]
@@ -82,6 +84,7 @@ const mockProducts = [
     stars: 4,
     categoryId: 2,
     published: true,
+    stock: 25,
     images: [
       'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=800&q=80'
     ]
@@ -95,6 +98,7 @@ const mockProducts = [
     stars: 5,
     categoryId: 2,
     published: true,
+    stock: 25,
     images: [
       'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80'
     ]
@@ -108,6 +112,7 @@ const mockProducts = [
     stars: 5,
     categoryId: 3,
     published: true,
+    stock: 25,
     images: [
       'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=800&q=80'
     ]
@@ -121,6 +126,7 @@ const mockProducts = [
     stars: 5,
     categoryId: 4,
     published: true,
+    stock: 25,
     images: [
       'https://images.unsplash.com/photo-1524805444758-089113d48a6d?auto=format&fit=crop&w=800&q=80'
     ]
@@ -134,6 +140,7 @@ const mockProducts = [
     stars: 4,
     categoryId: 5,
     published: true,
+    stock: 25,
     images: [
       'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=800&q=80'
     ]
@@ -147,6 +154,7 @@ const mockProducts = [
     stars: 5,
     categoryId: 6,
     published: true,
+    stock: 25,
     images: [
       'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80'

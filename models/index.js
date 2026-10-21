@@ -83,6 +83,80 @@ async function test() {
     });
     console.log('Database synchronized.');
     db.isConnected = true;
+    await ensureSchemaUpdates();
+async function ensureSchemaUpdates() {
+  const queryInterface = db.sequelize.getQueryInterface();
+  try {
+    const productDesc = await queryInterface.describeTable('Products').catch(() => null);
+    if (productDesc && !productDesc.stock) {
+      await queryInterface.addColumn('Products', 'stock', {
+        type: Sequelize.DataTypes.INTEGER,
+        defaultValue: 25,
+        allowNull: false
+      }).catch(err => console.warn('stock add column notice:', err.message));
+      console.log('Added column stock to Products table.');
+    }
+  } catch (e) {
+    console.warn('Product schema check:', e.message);
+  }
+
+  try {
+    const orderDesc = await queryInterface.describeTable('Orders').catch(() => null);
+    if (orderDesc) {
+      if (orderDesc.userId && !orderDesc.userId.allowNull) {
+        await queryInterface.changeColumn('Orders', 'userId', {
+          type: Sequelize.DataTypes.INTEGER,
+          allowNull: true
+        }).catch(err => console.warn('userId allowNull change notice:', err.message));
+      }
+      if (!orderDesc.orderCode) {
+        await queryInterface.addColumn('Orders', 'orderCode', {
+          type: Sequelize.DataTypes.STRING,
+          allowNull: true
+        }).catch(err => console.warn('orderCode notice:', err.message));
+      }
+      if (!orderDesc.customerName) {
+        await queryInterface.addColumn('Orders', 'customerName', {
+          type: Sequelize.DataTypes.STRING,
+          allowNull: true
+        }).catch(err => console.warn('customerName notice:', err.message));
+      }
+      if (!orderDesc.customerPhone) {
+        await queryInterface.addColumn('Orders', 'customerPhone', {
+          type: Sequelize.DataTypes.STRING,
+          allowNull: true
+        }).catch(err => console.warn('customerPhone notice:', err.message));
+      }
+      if (!orderDesc.orderSource) {
+        await queryInterface.addColumn('Orders', 'orderSource', {
+          type: Sequelize.DataTypes.STRING,
+          defaultValue: 'web_auth'
+        }).catch(err => console.warn('orderSource notice:', err.message));
+      }
+      if (!orderDesc.orderStatus) {
+        await queryInterface.addColumn('Orders', 'orderStatus', {
+          type: Sequelize.DataTypes.STRING,
+          defaultValue: 'pending_whatsapp'
+        }).catch(err => console.warn('orderStatus notice:', err.message));
+      }
+      if (!orderDesc.expiresAt) {
+        await queryInterface.addColumn('Orders', 'expiresAt', {
+          type: Sequelize.DataTypes.DATE,
+          allowNull: true
+        }).catch(err => console.warn('expiresAt notice:', err.message));
+      }
+      if (!orderDesc.secretToken) {
+        await queryInterface.addColumn('Orders', 'secretToken', {
+          type: Sequelize.DataTypes.STRING,
+          allowNull: true
+        }).catch(err => console.warn('secretToken notice:', err.message));
+      }
+    }
+  } catch (e) {
+    console.warn('Orders schema check:', e.message);
+  }
+}
+
   } catch (error) {
     db.isConnected = false;
     console.warn(`Database connection notice: ${error.message}. Operating in Mock Fallback Mode.`);

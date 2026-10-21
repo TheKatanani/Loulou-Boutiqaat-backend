@@ -18,7 +18,7 @@ const parseImages = (images) => {
 
 const getCatalogProducts = async () => {
   if (!db.isConnected) {
-    return db.mockData.mockProducts.filter(p => p.published !== false);
+    return (db.mockData.mockProducts || []).filter(p => p.published !== false);
   }
   try {
     const Product = db.products;
@@ -26,6 +26,7 @@ const getCatalogProducts = async () => {
     return prods.map(p => {
       const data = p.dataValues ? { ...p.dataValues } : { ...p };
       data.images = parseImages(data.images);
+      data.stock = typeof data.stock === 'number' ? data.stock : 25;
       return data;
     });
   } catch (err) {
@@ -51,7 +52,7 @@ const escapeXml = (unsafe) => {
     .replace(/'/g, '&apos;');
 };
 
-// 1. Meta / Facebook / WhatsApp XML RSS Feed
+// 1. Meta / Facebook / WhatsApp XML RSS Feed (Live Inventory & Stock Status)
 router.get('/facebook-feed.xml', async (req, res) => {
   try {
     const products = await getCatalogProducts();
@@ -73,6 +74,8 @@ router.get('/facebook-feed.xml', async (req, res) => {
       const priceNum = Number(p.price) || 0;
       const formattedPrice = `${priceNum.toFixed(2)} ILS`;
       const productLink = `${siteUrl}/home/products/${p.id}`;
+      const stock = typeof p.stock === 'number' ? p.stock : 25;
+      const availability = stock > 0 ? 'in stock' : 'out of stock';
 
       xml += `    <item>
       <g:id>${p.id}</g:id>
@@ -82,9 +85,9 @@ router.get('/facebook-feed.xml', async (req, res) => {
       <g:image_link>${escapeXml(mainImg)}</g:image_link>
       <g:brand><![CDATA[Loulou Boutiqaat]]></g:brand>
       <g:condition>new</g:condition>
-      <g:availability>in stock</g:availability>
+      <g:availability>${availability}</g:availability>
       <g:price>${formattedPrice}</g:price>
-      <g:inventory>50</g:inventory>
+      <g:inventory>${stock}</g:inventory>
     </item>
 `;
     });
@@ -106,7 +109,7 @@ router.get('/products.csv', async (req, res) => {
     const products = await getCatalogProducts();
     const siteUrl = 'https://loulou-boutiqaat.vercel.app';
 
-    let csv = 'id,title,description,availability,condition,price,link,image_link,brand\n';
+    let csv = 'id,title,description,availability,condition,price,link,image_link,brand,inventory\n';
 
     products.forEach((p) => {
       const images = parseImages(p.images);
@@ -115,8 +118,10 @@ router.get('/products.csv', async (req, res) => {
       const safeDesc = `"${(p.description || '').replace(/"/g, '""')}"`;
       const link = `${siteUrl}/home/products/${p.id}`;
       const price = `${p.price} ILS`;
+      const stock = typeof p.stock === 'number' ? p.stock : 25;
+      const availability = stock > 0 ? 'in stock' : 'out of stock';
 
-      csv += `${p.id},${safeTitle},${safeDesc},in stock,new,${price},${link},${mainImg},Loulou Boutiqaat\n`;
+      csv += `${p.id},${safeTitle},${safeDesc},${availability},new,${price},${link},${mainImg},Loulou Boutiqaat,${stock}\n`;
     });
 
     res.header('Content-Type', 'text/csv; charset=utf-8');
@@ -128,7 +133,7 @@ router.get('/products.csv', async (req, res) => {
   }
 });
 
-// 3. JSON summary with direct WhatsApp sharing URLs
+// 3. JSON summary with direct WhatsApp sharing URLs & stock status
 router.get('/summary', async (req, res) => {
   try {
     const products = await getCatalogProducts();
@@ -138,6 +143,7 @@ router.get('/summary', async (req, res) => {
     const items = products.map((p) => {
       const images = parseImages(p.images);
       const productUrl = `${siteUrl}/home/products/${p.id}`;
+      const stock = typeof p.stock === 'number' ? p.stock : 25;
       const waText = encodeURIComponent(`مرحباً لولو بوتيكات، أرغب بطلب:\n*${p.name}*\nالسعر: ${p.price} ₪\nرابط المنتج: ${productUrl}`);
       const directWaLink = `https://wa.me/${waNumber}?text=${waText}`;
 
@@ -145,6 +151,8 @@ router.get('/summary', async (req, res) => {
         id: p.id,
         name: p.name,
         price: p.price,
+        stock,
+        availability: stock > 0 ? 'in stock' : 'out of stock',
         image: images[0] || null,
         url: productUrl,
         directOrderWhatsAppUrl: directWaLink
