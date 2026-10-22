@@ -47,6 +47,8 @@ app.get('/health', (req, res) => {
     service: 'Loulou Boutiqaat API',
     uptime: Math.floor(process.uptime()),
     database: db.isConnected ? 'connected' : 'mock-fallback',
+    commit: process.env.RENDER_GIT_COMMIT || '57de9af',
+    databaseTarget: db.sequelize?.config?.database || 'unknown',
     timestamp: new Date().toISOString()
   });
 });
