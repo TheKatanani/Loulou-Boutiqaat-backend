@@ -87,13 +87,17 @@ app.all('*', (req, res) => {
 
 app.use(errorHandler)
 
-const { cleanupExpiredDrafts } = require('./services/orderService')
+const db = require('./models');
+const { cleanupExpiredDrafts } = require('./services/orderService');
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Loulou Boutiqaat backend listening on 0.0.0.0:${PORT}`)
-  // Initialize periodic draft cleanup (60-minute WhatsApp reservation expiration)
-  cleanupExpiredDrafts().catch((e) => console.error('Initial cleanup error:', e.message))
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`Loulou Boutiqaat backend listening on 0.0.0.0:${PORT}`);
+  // Wait for database connection and schema updates before starting background jobs
+  if (db.initPromise) {
+    await db.initPromise.catch((err) => console.warn('Database initialization warning:', err.message));
+  }
+  cleanupExpiredDrafts().catch((e) => console.error('Initial cleanup error:', e.message));
   setInterval(() => {
-    cleanupExpiredDrafts().catch((e) => console.error('Interval cleanup error:', e.message))
-  }, 60 * 1000)
-})
+    cleanupExpiredDrafts().catch((e) => console.error('Interval cleanup error:', e.message));
+  }, 60 * 1000);
+});

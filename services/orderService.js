@@ -64,6 +64,45 @@ const normalizeItems = (items) => {
 };
 
 /**
+ * Compares an existing order's stored items with an incoming payload
+ * Returns true only if items, quantities, and customer details match exactly.
+ */
+const isPayloadMatching = (existingOrder, normalizedItems, customerPhone, location) => {
+  if (!existingOrder) return false;
+  let existingItems = [];
+  try {
+    existingItems = typeof existingOrder.orders === 'string'
+      ? JSON.parse(existingOrder.orders)
+      : (Array.isArray(existingOrder.orders) ? existingOrder.orders : []);
+  } catch (e) {
+    return false;
+  }
+
+  if (existingItems.length !== normalizedItems.length) return false;
+
+  const sortedA = [...normalizedItems].sort((a, b) => a.productId - b.productId);
+  const sortedB = [...existingItems].sort((a, b) => Number(a.productId || a.id) - Number(b.productId || b.id));
+
+  for (let i = 0; i < sortedA.length; i++) {
+    const a = sortedA[i];
+    const b = sortedB[i];
+    const bId = Number(b.productId || b.id);
+    const bQty = Number(b.quantity || b.count || 1);
+    if (a.productId !== bId || a.quantity !== bQty) {
+      return false;
+    }
+  }
+
+  if (customerPhone && existingOrder.customerPhone) {
+    const p1 = String(customerPhone).replace(/\D/g, '');
+    const p2 = String(existingOrder.customerPhone).replace(/\D/g, '');
+    if (p1 && p2 && p1 !== p2) return false;
+  }
+
+  return true;
+};
+
+/**
  * Shared logic to validate availability and reserve/deduct stock.
  * Uses SELECT FOR UPDATE with ordered IDs to prevent deadlocks and overselling.
  */
@@ -99,15 +138,15 @@ const lockAndDeductStock = async (normalizedItems, { t = null } = {}) => {
         throw new Error(`المنتج رقم #${item.productId} غير موجود بالمتجر`);
       }
 
-      if (prod.published === false) {
+      if (prod.published === false || prod.published === 0) {
         throw new Error(`المنتج "${prod.name}" غير متاح للشراء حالياً`);
       }
 
-      const availableStock = typeof prod.stock === 'number' ? prod.stock : 0;
+      const availableStock = prod.stock !== undefined && prod.stock !== null ? prod.stock : 0;
       if (availableStock < item.quantity) {
         outOfStockErrors.push({
           productId: prod.id,
-          name: prod.name,
+          productName: prod.name,
           requested: item.quantity,
           available: availableStock,
         });
@@ -115,52 +154,66 @@ const lockAndDeductStock = async (normalizedItems, { t = null } = {}) => {
     }
 
     if (outOfStockErrors.length > 0) {
-      const names = outOfStockErrors.map((e) => `"${e.name}" (المتاح: ${e.available})`).join('، ');
-      throw new InsufficientStockError(`عذراً، الكمية المطلوبة غير متوفرة حالياً للمنتجات: ${names}`, outOfStockErrors);
+      const detailsMsg = outOfStockErrors
+        .map((e) => `المنتج "${e.productName}": المطلوب ${e.requested} والمتاح بالمخزون ${e.available}`)
+        .join('، ');
+      throw new InsufficientStockError(
+        `عذراً، بعض المنتجات المطلوبة غير متوفرة بالكمية الكافية: ${detailsMsg}`,
+        outOfStockErrors
+      );
     }
 
-    // Deduct stock for each product (never fallback to 25 if stock is 0)
+    // Deduct stock and build invoice snapshot
     for (const item of sortedItems) {
       const prod = productMap.get(item.productId);
-      const currentStock = typeof prod.stock === 'number' ? prod.stock : 0;
-      const newStock = Math.max(0, currentStock - item.quantity);
-      await prod.update({ stock: newStock }, { transaction: t });
+      await Product.decrement('stock', {
+        by: item.quantity,
+        where: { id: prod.id },
+        transaction: t,
+      });
 
-      const price = Number(prod.price) || 0;
-      const subtotal = price * item.quantity;
-      totalCost += subtotal;
+      const lineTotal = Number(prod.price) * item.quantity;
+      totalCost += lineTotal;
+
+      let imageUrl = null;
+      if (prod.images) {
+        try {
+          const imgs = typeof prod.images === 'string' ? JSON.parse(prod.images) : prod.images;
+          imageUrl = Array.isArray(imgs) ? imgs[0] : imgs;
+        } catch (e) {
+          imageUrl = prod.images;
+        }
+      }
 
       snapshot.push({
         productId: prod.id,
         name: prod.name,
-        price,
+        price: Number(prod.price),
         quantity: item.quantity,
-        subtotal,
+        image: imageUrl,
+        lineTotal,
       });
     }
   } else {
-    // In production, reject if DB is disconnected
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('خدمة الطلبات غير متاحة مؤقتاً لصيانة قاعدة البيانات، يرجى المحاولة بعد قليل.');
-    }
-
-    // Mock Mode Fallback (In-memory simulation for local dev)
+    // Mock Data Fallback
     const mockProducts = db.mockData.mockProducts;
     const outOfStockErrors = [];
 
     for (const item of sortedItems) {
       const prod = mockProducts.find((p) => p.id === item.productId);
       if (!prod) {
-        throw new Error(`المنتج رقم #${item.productId} غير موجود`);
+        throw new Error(`المنتج رقم #${item.productId} غير موجود بالمتجر`);
       }
-      if (prod.published === false) {
+
+      if (prod.published === false || prod.published === 0) {
         throw new Error(`المنتج "${prod.name}" غير متاح للشراء حالياً`);
       }
-      const availableStock = typeof prod.stock === 'number' ? prod.stock : 0;
+
+      const availableStock = prod.stock !== undefined && prod.stock !== null ? prod.stock : 0;
       if (availableStock < item.quantity) {
         outOfStockErrors.push({
           productId: prod.id,
-          name: prod.name,
+          productName: prod.name,
           requested: item.quantity,
           available: availableStock,
         });
@@ -168,25 +221,34 @@ const lockAndDeductStock = async (normalizedItems, { t = null } = {}) => {
     }
 
     if (outOfStockErrors.length > 0) {
-      const names = outOfStockErrors.map((e) => `"${e.name}" (المتاح: ${e.available})`).join('، ');
-      throw new InsufficientStockError(`عذراً، الكمية غير متوفرة: ${names}`, outOfStockErrors);
+      const detailsMsg = outOfStockErrors
+        .map((e) => `المنتج "${e.productName}": المطلوب ${e.requested} والمتاح ${e.available}`)
+        .join('، ');
+      throw new InsufficientStockError(
+        `عذراً، بعض المنتجات غير متوفرة بالكمية الكافية: ${detailsMsg}`,
+        outOfStockErrors
+      );
     }
 
     for (const item of sortedItems) {
       const prod = mockProducts.find((p) => p.id === item.productId);
-      const currentStock = typeof prod.stock === 'number' ? prod.stock : 0;
-      prod.stock = Math.max(0, currentStock - item.quantity);
+      prod.stock = (prod.stock || 0) - item.quantity;
 
-      const price = Number(prod.price) || 0;
-      const subtotal = price * item.quantity;
-      totalCost += subtotal;
+      const lineTotal = Number(prod.price) * item.quantity;
+      totalCost += lineTotal;
+
+      let imageUrl = null;
+      if (prod.images) {
+        imageUrl = Array.isArray(prod.images) ? prod.images[0] : prod.images;
+      }
 
       snapshot.push({
         productId: prod.id,
         name: prod.name,
-        price,
+        price: Number(prod.price),
         quantity: item.quantity,
-        subtotal,
+        image: imageUrl,
+        lineTotal,
       });
     }
   }
@@ -204,19 +266,23 @@ const restoreStock = async (items, { t = null } = {}) => {
   if (db.isConnected) {
     const Product = db.products;
     for (const item of items) {
-      const qty = Number(item.quantity) || 1;
+      const pId = Number(item.productId || item.id);
+      const qty = Number(item.quantity || item.count) || 1;
+      if (!pId) continue;
       await Product.increment('stock', {
         by: qty,
-        where: { id: item.productId },
+        where: { id: pId },
         transaction: t,
       });
     }
   } else {
     const mockProducts = db.mockData.mockProducts;
     for (const item of items) {
-      const prod = mockProducts.find((p) => p.id === Number(item.productId));
+      const pId = Number(item.productId || item.id);
+      const qty = Number(item.quantity || item.count) || 1;
+      const prod = mockProducts.find((p) => p.id === pId);
       if (prod) {
-        prod.stock = (prod.stock || 0) + (Number(item.quantity) || 1);
+        prod.stock = (prod.stock || 0) + qty;
       }
     }
   }
@@ -258,14 +324,14 @@ const generateWhatsAppLink = ({ orderCode, customerName, customerPhone, location
   snapshot.forEach((item, idx) => {
     message += `\n${idx + 1}) *${item.name}*\n`;
     message += `   ▫️ الكمية: ${item.quantity}\n`;
-    message += `   ▫️ السعر: ${item.subtotal} ₪\n`;
-    message += `   🔗 https://loulou-boutiqaat.vercel.app/home/products/${item.productId}\n`;
+    message += `   ▫️ السعر: ${item.price} ₪\n`;
+    message += `   ▫️ الإجمالي: ${item.lineTotal || item.price * item.quantity} ₪\n`;
   });
 
   message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
-  message += `💰 *المجموع النهائي:* ${totalCost} ₪\n`;
-  message += `🚚 *طريقة الدفع:* الدفع عند الاستلام\n\n`;
-  message += `يرجى تأكيد استلام الطلب وتحديد موعد التوصيل، شكراً لكم! ✨`;
+  message += `💰 *المجموع النهائي المطلوب:* *${totalCost} ₪*\n\n`;
+  message += `🚚 التوصيل متاح لكافة مناطق قطاع غزة.\n`;
+  message += `يرجى تأكيد موعد الاستلام المناسب لكم. شكراً لتسوقكم من لولو بوتيكات! ✨`;
 
   return `https://wa.me/${storePhone}?text=${encodeURIComponent(message)}`;
 };
@@ -284,6 +350,25 @@ const createWhatsAppDraft = async ({
 }) => {
   const normalized = normalizeItems(items);
 
+  // Check active pending drafts cap per phone (max 3 unexpired reservations per phone)
+  if (customerPhone && db.isConnected) {
+    const cleanPhone = String(customerPhone).replace(/\D/g, '');
+    if (cleanPhone.length >= 9) {
+      const activeDraftsCount = await db.order.count({
+        where: {
+          customerPhone: { [db.Sequelize.Op.like]: `%${cleanPhone.slice(-9)}` },
+          orderStatus: 'pending_whatsapp',
+          expiresAt: { [db.Sequelize.Op.gt]: new Date() },
+        },
+      });
+      if (activeDraftsCount >= 3) {
+        const err = new Error('لديك 3 حجوزات نشطة حالياً. يرجى إتمام أحد الطلبات السابقة أو إلغاؤه قبل إنشاء حجز جديد.');
+        err.statusCode = 429;
+        throw err;
+      }
+    }
+  }
+
   // Check Idempotency Key first
   if (idempotencyKey) {
     if (db.isConnected) {
@@ -291,6 +376,12 @@ const createWhatsAppDraft = async ({
         where: { idempotencyKey },
       });
       if (existing) {
+        if (!isPayloadMatching(existing, normalized, customerPhone, location)) {
+          const conflictErr = new Error('تم استخدام مفتاح الإعادة (Idempotency Key) مسبقاً مع بيانات أو سلة مختلفة');
+          conflictErr.statusCode = 409;
+          throw conflictErr;
+        }
+
         const now = new Date();
         // If still active, return existing draft
         if (existing.orderStatus === 'pending_whatsapp' && (!existing.expiresAt || new Date(existing.expiresAt) > now)) {
@@ -319,6 +410,12 @@ const createWhatsAppDraft = async ({
     } else {
       const existing = (db.mockData.mockOrders || []).find((o) => o.idempotencyKey === idempotencyKey);
       if (existing) {
+        if (!isPayloadMatching(existing, normalized, customerPhone, location)) {
+          const conflictErr = new Error('تم استخدام مفتاح الإعادة (Idempotency Key) مسبقاً مع بيانات أو سلة مختلفة');
+          conflictErr.statusCode = 409;
+          throw conflictErr;
+        }
+
         const now = new Date();
         if (existing.orderStatus === 'pending_whatsapp' && (!existing.expiresAt || new Date(existing.expiresAt) > now)) {
           const orderSnapshot = Array.isArray(existing.orders) ? existing.orders : [];
@@ -400,6 +497,38 @@ const createWhatsAppDraft = async ({
       };
     } catch (err) {
       await t.rollback();
+
+      // Handle race condition: unique constraint error on idempotencyKey
+      if ((err.name === 'SequelizeUniqueConstraintError' || err.message?.includes('Duplicate')) && idempotencyKey) {
+        const existing = await db.order.findOne({ where: { idempotencyKey } });
+        if (existing) {
+          if (!isPayloadMatching(existing, normalized, customerPhone, location)) {
+            const conflictErr = new Error('تم استخدام مفتاح الإعادة (Idempotency Key) مسبقاً مع بيانات أو سلة مختلفة');
+            conflictErr.statusCode = 409;
+            throw conflictErr;
+          }
+          const orderSnapshot = typeof existing.orders === 'string' ? JSON.parse(existing.orders) : existing.orders;
+          const waUrl = generateWhatsAppLink({
+            orderCode: existing.orderCode,
+            customerName: existing.customerName,
+            customerPhone: existing.customerPhone,
+            location: existing.location,
+            snapshot: orderSnapshot,
+            totalCost: existing.totalCost,
+          });
+          return {
+            id: existing.id,
+            orderCode: existing.orderCode,
+            totalCost: existing.totalCost,
+            expiresAt: existing.expiresAt,
+            secretToken: existing.secretToken,
+            orderStatus: existing.orderStatus,
+            waUrl,
+            items: orderSnapshot,
+            idempotent: true,
+          };
+        }
+      }
       throw err;
     }
   } else {
@@ -474,6 +603,11 @@ const createWebOrder = async ({
   if (idempotencyKey && db.isConnected) {
     const existing = await db.order.findOne({ where: { idempotencyKey } });
     if (existing) {
+      if (!isPayloadMatching(existing, normalized, customerPhone, location)) {
+        const conflictErr = new Error('تم استخدام مفتاح الإعادة (Idempotency Key) مسبقاً مع بيانات أو سلة مختلفة');
+        conflictErr.statusCode = 409;
+        throw conflictErr;
+      }
       return sanitizeOrder(existing);
     }
   }
@@ -508,6 +642,18 @@ const createWebOrder = async ({
       return sanitizeOrder(order);
     } catch (err) {
       await t.rollback();
+
+      if ((err.name === 'SequelizeUniqueConstraintError' || err.message?.includes('Duplicate')) && idempotencyKey) {
+        const existing = await db.order.findOne({ where: { idempotencyKey } });
+        if (existing) {
+          if (!isPayloadMatching(existing, normalized, customerPhone, location)) {
+            const conflictErr = new Error('تم استخدام مفتاح الإعادة (Idempotency Key) مسبقاً مع بيانات أو سلة مختلفة');
+            conflictErr.statusCode = 409;
+            throw conflictErr;
+          }
+          return sanitizeOrder(existing);
+        }
+      }
       throw err;
     }
   } else {
@@ -529,17 +675,18 @@ const createWebOrder = async ({
       totalCost,
       paid: 0,
       location: location || '',
-      customerName,
-      customerPhone,
+      customerName: customerName || '',
+      customerPhone: customerPhone || '',
       orderSource: 'web_auth',
       orderStatus: 'confirmed',
       inventoryTracked: true,
+      idempotencyKey: idempotencyKey || null,
       status: false,
       createdAt: new Date().toISOString(),
     };
 
     mockOrders.unshift(newOrder);
-    return newOrder;
+    return sanitizeOrder(newOrder);
   }
 };
 
@@ -588,7 +735,9 @@ const getWhatsAppDraft = async (id, token) => {
 
 /**
  * 4. Cancel WhatsApp Draft & Release Reservation
- * Row-locked, idempotent, and only restores stock once
+ * Row-locked, idempotent, and enforces strict state transitions.
+ * - 'expired' ONLY applies to pending_whatsapp orders whose expiresAt has passed.
+ * - 'cancelled' applies to pending_whatsapp or confirmed orders.
  */
 const cancelOrExpireOrder = async (orderId, targetStatus = 'cancelled') => {
   if (targetStatus !== 'cancelled' && targetStatus !== 'expired') {
@@ -598,7 +747,6 @@ const cancelOrExpireOrder = async (orderId, targetStatus = 'cancelled') => {
   if (db.isConnected) {
     const t = await db.sequelize.transaction();
     try {
-      // Row-level lock to prevent concurrent double release
       const order = await db.order.findByPk(orderId, {
         transaction: t,
         lock: t.LOCK.UPDATE,
@@ -606,17 +754,32 @@ const cancelOrExpireOrder = async (orderId, targetStatus = 'cancelled') => {
 
       if (!order) throw new Error('الطلب غير موجود');
 
-      // Idempotency: if already cancelled or expired, do not restore again
-      if (order.orderStatus === 'cancelled' || order.orderStatus === 'expired') {
+      // Idempotency: if already in targetStatus, return
+      if (order.orderStatus === targetStatus || order.orderStatus === 'cancelled' || order.orderStatus === 'expired') {
         await t.commit();
         return sanitizeOrder(order);
       }
 
-      if (order.orderStatus === 'delivered') {
-        throw new Error('لا يمكن إلغاء طلب تم تسليمه للعميل بالفعل');
+      // Enforce strict expiration conditions:
+      if (targetStatus === 'expired') {
+        if (order.orderStatus !== 'pending_whatsapp') {
+          // Cannot expire an order that is already confirmed or delivered
+          await t.commit();
+          return sanitizeOrder(order);
+        }
+        if (order.expiresAt && new Date(order.expiresAt) > new Date()) {
+          throw new Error('لا يمكن إنهاء حجز لم تنتهِ صلاحيته بعد');
+        }
       }
 
-      // Only restore stock if currently active and tracked
+      // Enforce cancellation conditions:
+      if (targetStatus === 'cancelled') {
+        if (order.orderStatus === 'delivered') {
+          throw new Error('لا يمكن إلغاء طلب تم تسليمه للعميل بالفعل');
+        }
+      }
+
+      // Only restore stock if currently active (pending_whatsapp or confirmed) and tracked
       if (
         (order.orderStatus === 'pending_whatsapp' || order.orderStatus === 'confirmed') &&
         order.inventoryTracked === true
@@ -644,11 +807,20 @@ const cancelOrExpireOrder = async (orderId, targetStatus = 'cancelled') => {
     const order = db.mockData.mockOrders.find((o) => Number(o.id) === Number(orderId));
     if (!order) throw new Error('الطلب غير موجود');
 
-    if (order.orderStatus === 'cancelled' || order.orderStatus === 'expired') {
+    if (order.orderStatus === targetStatus || order.orderStatus === 'cancelled' || order.orderStatus === 'expired') {
       return order;
     }
 
-    if (order.orderStatus === 'delivered') {
+    if (targetStatus === 'expired') {
+      if (order.orderStatus !== 'pending_whatsapp') {
+        return order;
+      }
+      if (order.expiresAt && new Date(order.expiresAt) > new Date()) {
+        throw new Error('لا يمكن إنهاء حجز لم تنتهِ صلاحيته بعد');
+      }
+    }
+
+    if (targetStatus === 'cancelled' && order.orderStatus === 'delivered') {
       throw new Error('لا يمكن إلغاء طلب تم تسليمه');
     }
 
@@ -702,6 +874,23 @@ const updateOrderStatus = async (orderId, newStatus) => {
         throw new Error('لا يمكن تعديل حالة طلب تم تسليمه');
       }
 
+      // Check timeout when confirming a pending draft:
+      if (newStatus === 'confirmed' && order.orderStatus === 'pending_whatsapp') {
+        const now = new Date();
+        if (order.expiresAt && new Date(order.expiresAt) <= now) {
+          // The reservation expired! Transition to expired and restore stock under lock
+          if (order.inventoryTracked === true) {
+            const items = typeof order.orders === 'string' ? JSON.parse(order.orders) : order.orders;
+            await restoreStock(items, { t });
+          }
+          await order.update(
+            { orderStatus: 'expired', inventoryTracked: false, status: false },
+            { transaction: t }
+          );
+          throw new Error('انتهت صلاحية حجز هذا الطلب (تجاوزت الـ 60 دقيقة) وأعيدت المنتجات للمخزون، لا يمكن تأكيده');
+        }
+      }
+
       const isDelivered = newStatus === 'delivered';
       await order.update(
         {
@@ -727,6 +916,20 @@ const updateOrderStatus = async (orderId, newStatus) => {
 
     if (order.orderStatus === 'delivered' && newStatus !== 'delivered') {
       throw new Error('لا يمكن تعديل حالة طلب تم تسليمه');
+    }
+
+    if (newStatus === 'confirmed' && order.orderStatus === 'pending_whatsapp') {
+      const now = new Date();
+      if (order.expiresAt && new Date(order.expiresAt) <= now) {
+        if (order.inventoryTracked === true) {
+          const items = Array.isArray(order.orders) ? order.orders : [];
+          await restoreStock(items);
+        }
+        order.orderStatus = 'expired';
+        order.inventoryTracked = false;
+        order.status = false;
+        throw new Error('انتهت صلاحية حجز هذا الطلب (تجاوزت الـ 60 دقيقة) وأعيدت المنتجات للمخزون، لا يمكن تأكيده');
+      }
     }
 
     order.orderStatus = newStatus;

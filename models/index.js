@@ -113,12 +113,10 @@ const ensureSchemaUpdates = async () => {
           allowNull: true
         }).catch(err => console.warn('orderCode notice:', err.message));
       }
-      if (!orderDesc.idempotencyKey) {
-        await queryInterface.addColumn('Orders', 'idempotencyKey', {
-          type: Sequelize.DataTypes.STRING,
-          allowNull: true,
-          unique: true
-        }).catch(err => console.warn('idempotencyKey notice:', err.message));
+      const hasIdempotency = orderDesc.idempotencyKey || orderDesc.idempotencykey;
+      if (!hasIdempotency) {
+        await db.sequelize.query("ALTER TABLE `Orders` ADD COLUMN `idempotencyKey` VARCHAR(255) NULL;").catch(err => console.warn('idempotencyKey col notice:', err.message));
+        await db.sequelize.query("ALTER TABLE `Orders` ADD UNIQUE INDEX `orders_idempotency_key_idx` (`idempotencyKey`);").catch(err => console.warn('idempotencyKey idx notice:', err.message));
       }
       if (!orderDesc.customerName) {
         await queryInterface.addColumn('Orders', 'customerName', {
@@ -150,9 +148,11 @@ const ensureSchemaUpdates = async () => {
           defaultValue: true
         }).catch(err => console.warn('inventoryTracked notice:', err.message));
 
-        // Mark pre-existing legacy orders as inventoryTracked = false to prevent phantom stock return
+        // Mark strictly pre-SSOT legacy orders (where orderCode IS NULL) as inventoryTracked = false
+        // to prevent phantom stock return on historical pre-inventory orders.
+        // Orders created under SSOT system have a non-null orderCode (e.g. #LB-xxx) and must remain inventoryTracked = true!
         await db.sequelize.query(
-          "UPDATE `Orders` SET `inventoryTracked` = false, `orderStatus` = IF(`status` = 1, 'delivered', 'confirmed') WHERE `orderSource` IS NULL OR `orderSource` = 'web_auth'"
+          "UPDATE `Orders` SET `inventoryTracked` = false, `orderStatus` = IF(`status` = 1, 'delivered', 'confirmed') WHERE `orderCode` IS NULL AND (`inventoryTracked` IS NULL OR `inventoryTracked` = true)"
         ).catch(err => console.warn('Legacy order migration notice:', err.message));
       }
       if (!orderDesc.expiresAt) {
@@ -188,6 +188,6 @@ async function test() {
     console.warn(`Database connection notice: ${error.message}. Operating in Mock Fallback Mode.`);
   }
 }
-test();
+db.initPromise = test();
 
 module.exports = db;

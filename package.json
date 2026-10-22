@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "test": "node test/unifiedOrderAudit.test.js",
     "build": "echo 'Build complete'",
     "dev": "nodemon server.js",
     "seed": "node seed.js"

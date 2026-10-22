@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 const db = require('../models');
 const Order = db.order;
 const orderService = require('../services/orderService');
@@ -24,15 +25,62 @@ const formatOrder = (order) => {
   return o;
 };
 
+const normalizeRoles = (rawRoles) => {
+  if (!rawRoles) return [];
+  if (Array.isArray(rawRoles)) return rawRoles.map(Number);
+  if (typeof rawRoles === 'number') return [rawRoles];
+  if (typeof rawRoles === 'string') {
+    const n = Number(rawRoles);
+    return isNaN(n) ? [] : [n];
+  }
+  if (typeof rawRoles === 'object') {
+    return Object.values(rawRoles).map(Number);
+  }
+  return [];
+};
+
 const isUserAdminOrEditor = (req) => {
   if (!req || !req.roles) return false;
-  const roles = Array.isArray(req.roles) ? req.roles : Object.values(req.roles);
+  const roles = normalizeRoles(req.roles);
   return roles.includes(ROLES_LIST.ADMIN) || roles.includes(ROLES_LIST.EDITOR);
+};
+
+const extractOptionalUser = (req) => {
+  if (req.id && req.roles) {
+    return { id: req.id, roles: req.roles };
+  }
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+      return {
+        id: decoded.userInfo?.id || null,
+        roles: decoded.userInfo?.roles || null,
+      };
+    } catch (e) {
+      return { id: null, roles: null };
+    }
+  }
+  return { id: null, roles: null };
+};
+
+const draftRateLimitMap = new Map();
+const checkRateLimit = (ip) => {
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxRequests = 25;
+  const timestamps = draftRateLimitMap.get(ip) || [];
+  const valid = timestamps.filter((t) => now - t < windowMs);
+  if (valid.length >= maxRequests) return false;
+  valid.push(now);
+  draftRateLimitMap.set(ip, valid);
+  return true;
 };
 
 /**
  * Returns orders:
- * - Admin/Editor sees all orders.
+ * - Admin/Editor sees all orders (including guest drafts).
  * - Regular authenticated user ONLY sees their own orders.
  */
 const getOrders = async (req, res) => {
@@ -62,7 +110,7 @@ const getOrders = async (req, res) => {
 
 /**
  * Returns a single order by ID.
- * Strict ownership check: only owner or admin can view.
+ * Strict ownership check: only owner or admin/editor can view.
  */
 const getOrder = async (req, res) => {
   const id = req.params.id;
@@ -103,12 +151,16 @@ const addOrder = async (req, res) => {
     const customerPhone = req.body.customerPhone || '';
     const idempotencyKey = req.body.idempotencyKey || req.headers['x-idempotency-key'] || null;
 
+    if (!location || typeof location !== 'string' || location.trim().length < 5) {
+      return res.status(400).json({ message: 'يرجى كتابة عنوان التوصيل بالتفصيل (5 أحرف على الأقل)' });
+    }
+
     const newOrder = await orderService.createWebOrder({
       userId,
       items: rawItems,
-      location,
-      customerName,
-      customerPhone,
+      location: location.trim(),
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
       idempotencyKey,
     });
     return res.status(201).json(formatOrder(newOrder));
@@ -126,20 +178,46 @@ const addOrder = async (req, res) => {
 };
 
 /**
- * Creates WhatsApp draft reservation (Public, no login needed)
+ * Creates WhatsApp draft reservation
+ * Allows both authenticated users (extracts verified userId) and guests (userId = null)
  * 60-minute reservation with row-level stock deduction
  */
 const createWhatsAppDraftHandler = async (req, res) => {
   try {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip)) {
+      return res.status(429).json({ message: 'تم تجاوز الحد الأقصى لمحاولات الحجز، يرجى المحاولة بعد قليل' });
+    }
+
     const { items, customerName, customerPhone, location } = req.body;
-    const userId = req.id || null;
+
+    if (!customerName || typeof customerName !== 'string' || customerName.trim().length < 2) {
+      return res.status(400).json({ message: 'يرجى كتابة الاسم الكريم (حرفان على الأقل)' });
+    }
+
+    const cleanPhone = (customerPhone || '').toString().trim().replace(/[^0-9+]/g, '');
+    const digitsOnly = cleanPhone.replace(/\D/g, '');
+    if (!cleanPhone || digitsOnly.length < 9 || digitsOnly.length > 15) {
+      return res.status(400).json({ message: 'يرجى إدخال رقم هاتف صالح للتواصل والتوصيل (9 أرقام على الأقل)' });
+    }
+
+    if (!location || typeof location !== 'string' || location.trim().length < 5) {
+      return res.status(400).json({ message: 'يرجى كتابة عنوان التوصيل بالتفصيل (5 أحرف على الأقل)' });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'سلة الطلبات فارغة' });
+    }
+
+    const authUser = extractOptionalUser(req);
+    const userId = authUser.id;
     const idempotencyKey = req.body.idempotencyKey || req.headers['x-idempotency-key'] || null;
 
     const result = await orderService.createWhatsAppDraft({
       items,
-      customerName,
-      customerPhone,
-      location,
+      customerName: customerName.trim(),
+      customerPhone: cleanPhone,
+      location: location.trim(),
       userId,
       idempotencyKey,
     });
@@ -149,6 +227,9 @@ const createWhatsAppDraftHandler = async (req, res) => {
       ...result,
     });
   } catch (err) {
+    if (err.statusCode === 429) {
+      return res.status(429).json({ message: err.message });
+    }
     if (err.name === 'InsufficientStockError' || err.statusCode === 409) {
       return res.status(409).json({
         message: err.message,

@@ -81,6 +81,14 @@ const getProducts = async (req, res) => {
 };
 
 const addProduct = async (req, res) => {
+  let stock = 0;
+  if (req.body?.stock !== undefined && req.body?.stock !== null && req.body?.stock !== '') {
+    const parsedStock = parseInt(req.body.stock, 10);
+    if (!isNaN(parsedStock) && parsedStock >= 0) {
+      stock = parsedStock;
+    }
+  }
+
   let info = {
     name: req.body?.name,
     description: req.body?.description,
@@ -89,8 +97,8 @@ const addProduct = async (req, res) => {
     prevPrice: req.body?.prevPrice, 
     stars: req.body?.stars,
     categoryId: req.body?.categoryId,
-    published: req.body?.published || false,
-    stock: typeof req.body?.stock === 'number' ? req.body.stock : 25,
+    published: req.body?.published !== undefined ? req.body.published : false,
+    stock,
   };
   try {
     const product = await Product.create(info);
@@ -110,23 +118,34 @@ const updateProduct = async (req, res) => {
         id
       }
     });
-    if (foundedItem) {
-      await Product.update(req.body, {
-        where: {
-          id
-        }
-      });
-      const product = await Product.findOne({
-        where: {
-          id
-        }
-      });
-      res.json(formatProduct(product));
-    } else {
-      res.status(404).json({
+    if (!foundedItem) {
+      return res.status(404).json({
         message: `can not found this Product!`
       });
     }
+
+    const updateData = { ...req.body };
+    if (updateData.stock !== undefined && updateData.stock !== null && updateData.stock !== '') {
+      const parsedStock = parseInt(updateData.stock, 10);
+      if (isNaN(parsedStock) || parsedStock < 0) {
+        return res.status(400).json({ message: 'يجب أن يكون المخزون عدداً صحيحاً أكبر من أو يساوي الصفر' });
+      }
+      updateData.stock = parsedStock;
+    } else if ('stock' in updateData && (updateData.stock === null || updateData.stock === '')) {
+      delete updateData.stock;
+    }
+
+    await Product.update(updateData, {
+      where: {
+        id
+      }
+    });
+    const product = await Product.findOne({
+      where: {
+        id
+      }
+    });
+    res.json(formatProduct(product));
   } catch (err) {
     res.status(400).json({
       message: err?.message || err
