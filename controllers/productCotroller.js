@@ -151,53 +151,141 @@ const updateProduct = async (req, res) => {
   }
 };
 
+const isStrictInteger = (val) => {
+  if (typeof val === 'number') return Number.isInteger(val);
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!/^[-+]?\d+$/.test(trimmed)) return false;
+    const num = Number(trimmed);
+    return Number.isSafeInteger(num);
+  }
+  return false;
+};
+
 /**
  * Dedicated inventory adjustment endpoint
- * Supports delta (+N / -N) or absolute value with expectedStock versioning check
+ * Strictly atomic: uses transaction row locking (t.LOCK.UPDATE) matching orderService
+ * Rejects non-integers, enforces expectedStock on absolute updates, and rejects negative stock on deltas
  */
 const updateProductStock = async (req, res) => {
   const id = req.params.id;
   try {
-    const foundedItem = await Product.findOne({ where: { id } });
-    if (!foundedItem) {
-      return res.status(404).json({ message: 'المنتج غير موجود' });
-    }
-
     const { stock, delta, expectedStock } = req.body;
 
+    if (delta !== undefined && stock !== undefined) {
+      return res.status(400).json({ message: 'يرجى إرسال إما التغيير النسبي (delta) أو المخزون المطلق (stock) وليس كلاهما' });
+    }
+
     if (delta !== undefined) {
-      const deltaNum = parseInt(delta, 10);
-      if (isNaN(deltaNum)) {
-        return res.status(400).json({ message: 'قيمة التغيير النسبي (delta) غير صالحة' });
+      if (!isStrictInteger(delta)) {
+        return res.status(400).json({ message: 'قيمة التغيير النسبي (delta) يجب أن تكون رقماً صحيحاً' });
       }
-      const newStock = Math.max(0, (foundedItem.stock || 0) + deltaNum);
-      await foundedItem.update({ stock: newStock });
-      return res.json(formatProduct(foundedItem));
+      const deltaNum = Number(delta);
+      if (deltaNum === 0) {
+        return res.status(400).json({ message: 'قيمة التغيير النسبي يجب ألا تكون صفراً' });
+      }
+
+      if (db.isConnected) {
+        let updatedItem;
+        await db.sequelize.transaction(async (t) => {
+          const item = await Product.findOne({
+            where: { id },
+            lock: t.LOCK.UPDATE,
+            transaction: t,
+          });
+          if (!item) {
+            const err = new Error('المنتج غير موجود');
+            err.statusCode = 404;
+            throw err;
+          }
+
+          const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 0;
+          const newStock = currentStock + deltaNum;
+          if (newStock < 0) {
+            const err = new Error(`لا يمكن أن يصبح المخزون سالباً: المخزون الحالي ${currentStock} والتغيير المطلوب ${deltaNum}`);
+            err.statusCode = 400;
+            throw err;
+          }
+
+          await item.update({ stock: newStock }, { transaction: t });
+          updatedItem = item;
+        });
+
+        return res.json(formatProduct(updatedItem));
+      } else {
+        const item = (db.mockData?.mockProducts || []).find((p) => Number(p.id) === Number(id));
+        if (!item) return res.status(404).json({ message: 'المنتج غير موجود' });
+        const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 0;
+        const newStock = currentStock + deltaNum;
+        if (newStock < 0) {
+          return res.status(400).json({ message: `لا يمكن أن يصبح المخزون سالباً: المخزون الحالي ${currentStock} والتغيير المطلوب ${deltaNum}` });
+        }
+        item.stock = newStock;
+        return res.json(formatProduct(item));
+      }
     }
 
     if (stock !== undefined && stock !== null && stock !== '') {
-      const parsedStock = parseInt(stock, 10);
-      if (isNaN(parsedStock) || parsedStock < 0) {
+      if (!isStrictInteger(stock) || Number(stock) < 0) {
         return res.status(400).json({ message: 'يجب أن يكون المخزون عدداً صحيحاً أكبر من أو يساوي الصفر' });
       }
 
-      if (expectedStock !== undefined && expectedStock !== null) {
-        const expected = parseInt(expectedStock, 10);
-        if (foundedItem.stock !== expected) {
-          return res.status(409).json({
-            message: `تعارض في تحديث المخزون: تغير المخزون في هذه الأثناء ليصبح ${foundedItem.stock} قطعة بدلاً من ${expected}`,
-            currentStock: foundedItem.stock,
-          });
-        }
+      if (expectedStock === undefined || expectedStock === null || !isStrictInteger(expectedStock) || Number(expectedStock) < 0) {
+        return res.status(400).json({ message: 'expectedStock مطلوب ويجب أن يكون رقماً صحيحاً غير سالب عند التعديل المطلق' });
       }
 
-      await foundedItem.update({ stock: parsedStock });
-      return res.json(formatProduct(foundedItem));
+      const targetStock = Number(stock);
+      const expStock = Number(expectedStock);
+
+      if (db.isConnected) {
+        let updatedItem;
+        await db.sequelize.transaction(async (t) => {
+          const item = await Product.findOne({
+            where: { id },
+            lock: t.LOCK.UPDATE,
+            transaction: t,
+          });
+          if (!item) {
+            const err = new Error('المنتج غير موجود');
+            err.statusCode = 404;
+            throw err;
+          }
+
+          const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 0;
+          if (currentStock !== expStock) {
+            const err = new Error(`تعارض في تحديث المخزون: تغير المخزون في هذه الأثناء ليصبح ${currentStock} قطعة بدلاً من ${expStock}`);
+            err.statusCode = 409;
+            err.currentStock = currentStock;
+            throw err;
+          }
+
+          await item.update({ stock: targetStock }, { transaction: t });
+          updatedItem = item;
+        });
+
+        return res.json(formatProduct(updatedItem));
+      } else {
+        const item = (db.mockData?.mockProducts || []).find((p) => Number(p.id) === Number(id));
+        if (!item) return res.status(404).json({ message: 'المنتج غير موجود' });
+        const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 0;
+        if (currentStock !== expStock) {
+          return res.status(409).json({
+            message: `تعارض في تحديث المخزون: تغير المخزون في هذه الأثناء ليصبح ${currentStock} قطعة بدلاً من ${expStock}`,
+            currentStock,
+          });
+        }
+        item.stock = targetStock;
+        return res.json(formatProduct(item));
+      }
     }
 
     return res.status(400).json({ message: 'يرجى تحديد قيمة المخزون الجديدة أو التغيير النسبي' });
   } catch (err) {
-    res.status(400).json({ message: err?.message || err });
+    const status = err.statusCode || 400;
+    return res.status(status).json({
+      message: err.message || err,
+      ...(err.currentStock !== undefined ? { currentStock: err.currentStock } : {}),
+    });
   }
 };
 

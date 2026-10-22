@@ -1,7 +1,7 @@
 const assert = require('assert');
 const ROLES_LIST = require('../../config/roles_list');
 const verifyRoles = require('../../middleware/verifyRoles');
-const { normalizeItems, safeCompareTokens, isPayloadMatching } = require('../../services/orderService');
+const { normalizeItems, safeCompareTokens, isPayloadMatching } = require('../../utils/orderUtils');
 
 console.log('====================================================');
 console.log('      LOULOU BOUTIQAAT - PURE UNIT TEST SUITE       ');

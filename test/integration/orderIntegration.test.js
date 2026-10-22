@@ -1,15 +1,36 @@
 const assert = require('assert');
 require('dotenv').config();
 
-// Ensure test environment uses the isolated loulou_test database
+// Ensure test environment uses the isolated loulou_test database (Fail-closed)
 process.env.NODE_ENV = 'test';
+
 if (!process.env.TEST_DATABASE_URL) {
-  process.env.TEST_DATABASE_URL = 'mysql://2draQUiscSgrmfL.root:zJ4XL3Vq3jwg1ZNR@gateway01.eu-central-1.prod.aws.tidbcloud.com:4000/loulou_test';
+  console.error('[CRITICAL SAFETY ABORT] TEST_DATABASE_URL is not set!');
+  console.error('Please configure TEST_DATABASE_URL in your .env or CI environment pointing to `loulou_test`.');
+  process.exit(1);
 }
 
+// Strictly verify the database name in TEST_DATABASE_URL is 'loulou_test' BEFORE requiring models
+let targetDb = '';
+try {
+  const parsed = new URL(process.env.TEST_DATABASE_URL);
+  targetDb = parsed.pathname.replace(/^\//, '').split('?')[0];
+} catch (e) {
+  const match = process.env.TEST_DATABASE_URL.match(/\/([^/?]+)(?:\?|$)/);
+  if (match) targetDb = match[1];
+}
+
+if (targetDb !== 'loulou_test') {
+  console.error(`[CRITICAL SAFETY ABORT] Refusing to run tests against database "${targetDb}"!`);
+  console.error('Target database must be strictly "loulou_test". Execution terminated immediately before connection/sync.');
+  process.exit(1);
+}
+
+// Safe to load models and controllers now
 const db = require('../../models');
 const orderService = require('../../services/orderService');
 const productController = require('../../controllers/productCotroller');
+const orderController = require('../../controllers/orderController');
 
 console.log('====================================================');
 console.log('    LOULOU BOUTIQAAT - REAL DB INTEGRATION SUITE    ');
@@ -50,7 +71,7 @@ const test = async (name, fn) => {
   // Seed test user
   await db.users.findOrCreate({
     where: { id: 88 },
-    defaults: { name: 'المشتري الثاني', email: 'test88@example.com', password: 'hash' },
+    defaults: { name: 'المشتري الثاني', password: 'hash' },
   });
 
   // Seed test category
@@ -60,7 +81,7 @@ const test = async (name, fn) => {
   });
 
   // Seed test products
-  const p1 = await db.products.create({
+  await db.products.create({
     id: 101,
     name: 'عطر رويال عود (آخر قطعة)',
     price: 120,
@@ -69,7 +90,7 @@ const test = async (name, fn) => {
     categoryId: cat.id,
   });
 
-  const p2 = await db.products.create({
+  await db.products.create({
     id: 102,
     name: 'مسك الختام الفاخر',
     price: 50,
@@ -78,12 +99,21 @@ const test = async (name, fn) => {
     categoryId: cat.id,
   });
 
-  const p3 = await db.products.create({
+  await db.products.create({
     id: 103,
     name: 'منتج غير منشور',
     price: 90,
     stock: 5,
     published: false,
+    categoryId: cat.id,
+  });
+
+  await db.products.create({
+    id: 104,
+    name: 'عود الخيال المتزامن',
+    price: 80,
+    stock: 5,
+    published: true,
     categoryId: cat.id,
   });
 
@@ -114,10 +144,6 @@ const test = async (name, fn) => {
 
     assert.strictEqual(fulfilled.length, 1, 'Exactly one order must succeed for the last piece');
     assert.strictEqual(rejected.length, 1, 'The other concurrent order must be rejected');
-    console.log('Concurrent rejection error:', {
-      name: rejected[0]?.reason?.name,
-      message: rejected[0]?.reason?.message,
-    });
     assert.ok(
       rejected[0].reason.name === 'InsufficientStockError' ||
       rejected[0].reason.message.includes('غير متوفرة') ||
@@ -259,38 +285,144 @@ const test = async (name, fn) => {
   });
 
   // --------------------------------------------------------------------------
-  // TEST 5: Dedicated Stock Adjustment with Optimistic Concurrency
+  // TEST 5: Stock Adjustment Atomicity, Concurrency & Interleaving Protection
   // --------------------------------------------------------------------------
-  await test('Dedicated stock adjustment: updates safely with expectedStock check', async () => {
-    const currentStock = (await db.products.findByPk(102)).stock;
+  await test('Interleaving order purchase rejects stale absolute update with 409 without overwriting customer reservation', async () => {
+    // 1. Initial product stock is recorded
+    const initialStock = (await db.products.findByPk(102)).stock;
+    const observedExpectedStock = initialStock;
 
-    // 1. Valid adjustment with correct expectedStock
-    let responseData = null;
-    const reqSuccess = {
-      params: { id: 102 },
-      body: { stock: 25, expectedStock: currentStock },
-    };
-    const resSuccess = {
-      json: (d) => { responseData = d; },
-      status: (c) => ({ json: (d) => { responseData = d; } }),
-    };
-    await productController.updateProductStock(reqSuccess, resSuccess);
-    assert.strictEqual(responseData.stock, 25);
+    // 2. An order purchase arrives in the meantime, deducting 1 piece
+    await orderService.createWhatsAppDraft({
+      items: [{ productId: 102, quantity: 1 }],
+      customerName: 'مشتري متزامن',
+      customerPhone: '0599555555',
+      location: 'غزة',
+    });
 
-    // 2. Conflict attempt with outdated expectedStock (stale)
-    let conflictStatus = null;
-    const reqConflict = {
+    const stockAfterPurchase = (await db.products.findByPk(102)).stock;
+    assert.strictEqual(stockAfterPurchase, initialStock - 1, 'Stock must decrease by 1 from customer reservation');
+
+    // 3. Admin submits absolute update based on observedExpectedStock (now stale!)
+    let statusCode = null;
+    let responseBody = null;
+    const req = {
       params: { id: 102 },
-      body: { stock: 30, expectedStock: 10 }, // Expecting 10, but live is 25!
+      body: { stock: initialStock + 5, expectedStock: observedExpectedStock },
     };
-    const resConflict = {
-      status: (code) => {
-        conflictStatus = code;
-        return { json: () => {} };
+    const res = {
+      status: (c) => {
+        statusCode = c;
+        return { json: (d) => { responseBody = d; } };
       },
+      json: (d) => { responseBody = d; },
     };
-    await productController.updateProductStock(reqConflict, resConflict);
-    assert.strictEqual(conflictStatus, 409, 'Must return 409 conflict when expectedStock does not match live stock');
+
+    await productController.updateProductStock(req, res);
+
+    assert.strictEqual(statusCode, 409, 'Must return 409 Conflict when expectedStock is stale');
+    assert.strictEqual(responseBody.currentStock, stockAfterPurchase, 'Must report the fresh live stock in 409 payload');
+
+    // 4. Verify live stock in DB remains intact (reservation NOT overwritten!)
+    const stockAfterRejectedAdmin = (await db.products.findByPk(102)).stock;
+    assert.strictEqual(stockAfterRejectedAdmin, stockAfterPurchase, 'Customer reservation must not be overwritten');
+  });
+
+  await test('Two concurrent delta=+1 stock adjustments increase quantity by exactly +2 (atomic locking)', async () => {
+    const initialStock = (await db.products.findByPk(104)).stock; // Starts at 5
+
+    const makeDeltaReq = () => {
+      let code = 200;
+      let body = null;
+      const req = { params: { id: 104 }, body: { delta: 1 } };
+      const res = {
+        status: (c) => { code = c; return { json: (d) => { body = d; } }; },
+        json: (d) => { body = d; },
+      };
+      return productController.updateProductStock(req, res).then(() => ({ code, body }));
+    };
+
+    const results = await Promise.all([makeDeltaReq(), makeDeltaReq()]);
+    assert.strictEqual(results[0].code, 200);
+    assert.strictEqual(results[1].code, 200);
+
+    const refreshed = await db.products.findByPk(104);
+    assert.strictEqual(refreshed.stock, initialStock + 2, 'Two simultaneous delta=+1 must result in exactly +2 stock');
+  });
+
+  await test('Delta rejecting negative stock and strict integer validation', async () => {
+    // 1. Negative stock rejection
+    let statusCode = null;
+    const reqNegative = { params: { id: 104 }, body: { delta: -999 } };
+    const resNegative = {
+      status: (c) => { statusCode = c; return { json: () => {} }; },
+      json: () => {},
+    };
+    await productController.updateProductStock(reqNegative, resNegative);
+    assert.strictEqual(statusCode, 400, 'Must return 400 when delta would cause negative stock');
+
+    // 2. Fractional/invalid integer rejection
+    let floatStatusCode = null;
+    const reqFloat = { params: { id: 104 }, body: { stock: 12.5, expectedStock: 7 } };
+    const resFloat = {
+      status: (c) => { floatStatusCode = c; return { json: () => {} }; },
+      json: () => {},
+    };
+    await productController.updateProductStock(reqFloat, resFloat);
+    assert.strictEqual(floatStatusCode, 400, 'Must return 400 for float stock');
+
+    // 3. String with trailing characters rejection
+    let strStatusCode = null;
+    const reqStr = { params: { id: 104 }, body: { delta: "2abc" } };
+    const resStr = {
+      status: (c) => { strStatusCode = c; return { json: () => {} }; },
+      json: () => {},
+    };
+    await productController.updateProductStock(reqStr, resStr);
+    assert.strictEqual(strStatusCode, 400, 'Must return 400 for invalid non-integer string');
+  });
+
+  // --------------------------------------------------------------------------
+  // TEST 6: HTTP Controller Passes 409 Conflict for Late Confirmation
+  // --------------------------------------------------------------------------
+  await test('HTTP order controller returns status 409 (not 400) on confirmation of expired draft', async () => {
+    // 1. Create a draft order
+    const draft = await orderService.createWhatsAppDraft({
+      items: [{ productId: 104, quantity: 1 }],
+      customerName: 'عميل متأخر HTTP',
+      customerPhone: '0599666666',
+      location: 'غزة',
+    });
+
+    // 2. Backdate expiresAt to 15 minutes ago
+    await db.order.update(
+      { expiresAt: new Date(Date.now() - 15 * 60 * 1000) },
+      { where: { id: draft.id } }
+    );
+
+    // 3. Admin attempts to confirm via HTTP controller
+    let httpStatusCode = null;
+    let httpResponseBody = null;
+    const req = {
+      params: { id: draft.id },
+      body: { orderStatus: 'confirmed' },
+    };
+    const res = {
+      status: (code) => {
+        httpStatusCode = code;
+        return {
+          json: (body) => { httpResponseBody = body; },
+        };
+      },
+      json: (body) => { httpResponseBody = body; },
+    };
+
+    await orderController.adminUpdateStatusHandler(req, res);
+
+    assert.strictEqual(httpStatusCode, 409, `HTTP controller must return 409 Conflict (got: ${httpStatusCode})`);
+    assert.ok(httpResponseBody.message.includes('انتهت صلاحية'), 'Error message must explain expiration');
+    assert.ok(httpResponseBody.order, 'Must return sanitized expired order');
+    assert.strictEqual(httpResponseBody.order.orderStatus, 'expired');
   });
 
   // Teardown

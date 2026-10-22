@@ -1,7 +1,35 @@
 const dbConfig = require('../config/dbConfig.js');
 const Sequelize = require('sequelize');
 
-let rawUrl = (process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL)
+// Fail-closed validation for test environment before initiating any connection or schema sync
+if (process.env.NODE_ENV === 'test') {
+  const testUrl = process.env.TEST_DATABASE_URL;
+  if (!testUrl || typeof testUrl !== 'string' || testUrl.trim() === '') {
+    throw new Error(
+      '[SAFETY ABORT] NODE_ENV is "test" but TEST_DATABASE_URL is not set! ' +
+      'Tests must fail-closed and must never fall back to DATABASE_URL or production database.'
+    );
+  }
+
+  // Strictly verify the database name in TEST_DATABASE_URL is 'loulou_test'
+  let targetDb = '';
+  try {
+    const parsed = new URL(testUrl);
+    targetDb = parsed.pathname.replace(/^\//, '').split('?')[0];
+  } catch (e) {
+    const match = testUrl.match(/\/([^/?]+)(?:\?|$)/);
+    if (match) targetDb = match[1];
+  }
+
+  if (targetDb !== 'loulou_test') {
+    throw new Error(
+      `[SAFETY ABORT] Refusing to run tests against database "${targetDb}"! ` +
+      `Target database must be strictly "loulou_test". Execution terminated immediately before connection/sync.`
+    );
+  }
+}
+
+let rawUrl = process.env.NODE_ENV === 'test'
   ? process.env.TEST_DATABASE_URL
   : (process.env.DATABASE_URL || '');
 let cleanUrl = rawUrl;

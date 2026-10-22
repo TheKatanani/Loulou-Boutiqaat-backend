@@ -294,8 +294,10 @@ const adminUpdateStatusHandler = async (req, res) => {
       order: formatOrder(updated),
     });
   } catch (err) {
-    return res.status(400).json({
+    const statusCode = err.statusCode || 400;
+    return res.status(statusCode).json({
       message: err.message || 'تعذر تحديث حالة الطلب',
+      ...(err.order ? { order: formatOrder(err.order) } : {}),
     });
   }
 };
@@ -336,7 +338,11 @@ const updateOrder = async (req, res) => {
       res.status(404).json({ message: 'can not found this order!' });
     }
   } catch (err) {
-    res.status(400).json({ message: err?.message || err });
+    const statusCode = err.statusCode || 400;
+    return res.status(statusCode).json({
+      message: err?.message || err,
+      ...(err.order ? { order: formatOrder(err.order) } : {}),
+    });
   }
 };
 
