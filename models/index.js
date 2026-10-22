@@ -1,7 +1,9 @@
 const dbConfig = require('../config/dbConfig.js');
 const Sequelize = require('sequelize');
 
-let rawUrl = process.env.DATABASE_URL || '';
+let rawUrl = (process.env.NODE_ENV === 'test' && process.env.TEST_DATABASE_URL)
+  ? process.env.TEST_DATABASE_URL
+  : (process.env.DATABASE_URL || '');
 let cleanUrl = rawUrl;
 const isTidbOrSsl = process.env.DB_SSL === 'true' || 
   rawUrl.includes('ssl') || 

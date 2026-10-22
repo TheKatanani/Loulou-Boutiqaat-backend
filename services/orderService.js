@@ -96,7 +96,9 @@ const isPayloadMatching = (existingOrder, normalizedItems, customerPhone, locati
   if (customerPhone && existingOrder.customerPhone) {
     const p1 = String(customerPhone).replace(/\D/g, '');
     const p2 = String(existingOrder.customerPhone).replace(/\D/g, '');
-    if (p1 && p2 && p1 !== p2) return false;
+    const sig1 = p1.length >= 9 ? p1.slice(-9) : p1;
+    const sig2 = p2.length >= 9 ? p2.slice(-9) : p2;
+    if (sig1 && sig2 && sig1 !== sig2) return false;
   }
 
   return true;
@@ -887,7 +889,12 @@ const updateOrderStatus = async (orderId, newStatus) => {
             { orderStatus: 'expired', inventoryTracked: false, status: false },
             { transaction: t }
           );
-          throw new Error('انتهت صلاحية حجز هذا الطلب (تجاوزت الـ 60 دقيقة) وأعيدت المنتجات للمخزون، لا يمكن تأكيده');
+          // Commit the expiration and stock restoration to the database so it is never rolled back!
+          await t.commit();
+          const err = new Error('انتهت صلاحية حجز هذا الطلب (تجاوزت الـ 60 دقيقة) وأعيدت المنتجات للمخزون، لا يمكن تأكيده');
+          err.statusCode = 409;
+          err.order = sanitizeOrder(order);
+          throw err;
         }
       }
 
@@ -903,7 +910,9 @@ const updateOrderStatus = async (orderId, newStatus) => {
       await t.commit();
       return sanitizeOrder(order);
     } catch (e) {
-      await t.rollback();
+      if (!t.finished) {
+        await t.rollback().catch(() => {});
+      }
       throw e;
     }
   } else {
@@ -928,7 +937,10 @@ const updateOrderStatus = async (orderId, newStatus) => {
         order.orderStatus = 'expired';
         order.inventoryTracked = false;
         order.status = false;
-        throw new Error('انتهت صلاحية حجز هذا الطلب (تجاوزت الـ 60 دقيقة) وأعيدت المنتجات للمخزون، لا يمكن تأكيده');
+        const err = new Error('انتهت صلاحية حجز هذا الطلب (تجاوزت الـ 60 دقيقة) وأعيدت المنتجات للمخزون، لا يمكن تأكيده');
+        err.statusCode = 409;
+        err.order = sanitizeOrder(order);
+        throw err;
       }
     }
 
@@ -983,6 +995,8 @@ const cleanupExpiredDrafts = async () => {
 module.exports = {
   InsufficientStockError,
   normalizeItems,
+  isPayloadMatching,
+  safeCompareTokens,
   createWhatsAppDraft,
   createWebOrder,
   getWhatsAppDraft,

@@ -124,16 +124,14 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    const updateData = { ...req.body };
-    if (updateData.stock !== undefined && updateData.stock !== null && updateData.stock !== '') {
-      const parsedStock = parseInt(updateData.stock, 10);
-      if (isNaN(parsedStock) || parsedStock < 0) {
-        return res.status(400).json({ message: 'يجب أن يكون المخزون عدداً صحيحاً أكبر من أو يساوي الصفر' });
+    // Only allow updating general attributes; stock is strictly protected from stale overwrite
+    const allowedFields = ['name', 'description', 'price', 'prevPrice', 'images', 'stars', 'categoryId', 'published'];
+    const updateData = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
       }
-      updateData.stock = parsedStock;
-    } else if ('stock' in updateData && (updateData.stock === null || updateData.stock === '')) {
-      delete updateData.stock;
-    }
+    });
 
     await Product.update(updateData, {
       where: {
@@ -150,6 +148,56 @@ const updateProduct = async (req, res) => {
     res.status(400).json({
       message: err?.message || err
     });
+  }
+};
+
+/**
+ * Dedicated inventory adjustment endpoint
+ * Supports delta (+N / -N) or absolute value with expectedStock versioning check
+ */
+const updateProductStock = async (req, res) => {
+  const id = req.params.id;
+  try {
+    const foundedItem = await Product.findOne({ where: { id } });
+    if (!foundedItem) {
+      return res.status(404).json({ message: 'المنتج غير موجود' });
+    }
+
+    const { stock, delta, expectedStock } = req.body;
+
+    if (delta !== undefined) {
+      const deltaNum = parseInt(delta, 10);
+      if (isNaN(deltaNum)) {
+        return res.status(400).json({ message: 'قيمة التغيير النسبي (delta) غير صالحة' });
+      }
+      const newStock = Math.max(0, (foundedItem.stock || 0) + deltaNum);
+      await foundedItem.update({ stock: newStock });
+      return res.json(formatProduct(foundedItem));
+    }
+
+    if (stock !== undefined && stock !== null && stock !== '') {
+      const parsedStock = parseInt(stock, 10);
+      if (isNaN(parsedStock) || parsedStock < 0) {
+        return res.status(400).json({ message: 'يجب أن يكون المخزون عدداً صحيحاً أكبر من أو يساوي الصفر' });
+      }
+
+      if (expectedStock !== undefined && expectedStock !== null) {
+        const expected = parseInt(expectedStock, 10);
+        if (foundedItem.stock !== expected) {
+          return res.status(409).json({
+            message: `تعارض في تحديث المخزون: تغير المخزون في هذه الأثناء ليصبح ${foundedItem.stock} قطعة بدلاً من ${expected}`,
+            currentStock: foundedItem.stock,
+          });
+        }
+      }
+
+      await foundedItem.update({ stock: parsedStock });
+      return res.json(formatProduct(foundedItem));
+    }
+
+    return res.status(400).json({ message: 'يرجى تحديد قيمة المخزون الجديدة أو التغيير النسبي' });
+  } catch (err) {
+    res.status(400).json({ message: err?.message || err });
   }
 };
 
@@ -234,6 +282,7 @@ module.exports = {
   getProducts,
   getProduct,
   updateProduct,
+  updateProductStock,
   deleteProduct,
   getPublishedProducts
 };
