@@ -42,14 +42,26 @@ app.use(express.static(path.join(__dirname, '/public')))
 // Health check endpoint for Render zero-downtime deployments and monitoring
 app.get('/health', (req, res) => {
   const db = require('./models');
-  res.status(200).json({
-    status: 'ok',
+  const isHealthy = db.isConnected === true;
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'ok' : 'initializing',
     service: 'Loulou Boutiqaat API',
     uptime: Math.floor(process.uptime()),
-    database: db.isConnected ? 'connected' : 'mock-fallback',
-    commit: process.env.RENDER_GIT_COMMIT || '57de9af',
+    database: db.isConnected ? 'connected' : 'disconnected',
+    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'e4cf833',
     databaseTarget: db.sequelize?.config?.database || 'unknown',
     timestamp: new Date().toISOString()
+  });
+});
+
+// Guard: ensure database is connected before processing API requests (never serve mock data during startup)
+app.use((req, res, next) => {
+  const db = require('./models');
+  if (req.path === '/health') return next();
+  if (db.isConnected) return next();
+  return res.status(503).json({
+    message: 'جاري تهيئة الاتصال بقاعدة البيانات، يرجى الانتظار ثوانٍ معدودة...',
+    status: 'initializing',
   });
 });
 
@@ -92,14 +104,21 @@ app.use(errorHandler)
 const db = require('./models');
 const { cleanupExpiredDrafts } = require('./services/orderService');
 
-app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`Loulou Boutiqaat backend listening on 0.0.0.0:${PORT}`);
-  // Wait for database connection and schema updates before starting background jobs
+(async () => {
+  // Await database connection & schema sync BEFORE opening the listening port
   if (db.initPromise) {
-    await db.initPromise.catch((err) => console.warn('Database initialization warning:', err.message));
+    try {
+      await db.initPromise;
+    } catch (err) {
+      console.warn('Database initialization warning:', err.message);
+    }
   }
-  cleanupExpiredDrafts().catch((e) => console.error('Initial cleanup error:', e.message));
-  setInterval(() => {
-    cleanupExpiredDrafts().catch((e) => console.error('Interval cleanup error:', e.message));
-  }, 60 * 1000);
-});
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Loulou Boutiqaat backend listening on 0.0.0.0:${PORT} [DB: ${db.sequelize?.config?.database || 'unknown'}]`);
+    cleanupExpiredDrafts().catch((e) => console.error('Initial cleanup error:', e.message));
+    setInterval(() => {
+      cleanupExpiredDrafts().catch((e) => console.error('Interval cleanup error:', e.message));
+    }, 60 * 1000);
+  });
+})();
