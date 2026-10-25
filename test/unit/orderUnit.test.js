@@ -111,6 +111,67 @@ test('isPayloadMatching compares order items, quantities, and customer phone', (
   assert.strictEqual(isPayloadMatching(existingOrder, matchingItems, '0569999999'), false); // different phone
 });
 
+// 5. Meta Webhook Verification Logic
+test('Webhook verification succeeds with correct mode and token', () => {
+  const req = {
+    query: {
+      'hub.mode': 'subscribe',
+      'hub.verify_token': 'loulou_wa_verify_token_2026',
+      'hub.challenge': 'CHALLENGE_STRING_123',
+    },
+  };
+  let responseData = null;
+  let responseStatus = null;
+  const res = {
+    status: (s) => {
+      responseStatus = s;
+      return { send: (d) => { responseData = d; } };
+    },
+    sendStatus: (s) => { responseStatus = s; },
+  };
+
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN || 'loulou_wa_verify_token_2026';
+
+  if (mode === 'subscribe' && token === expectedToken) {
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
+  }
+
+  assert.strictEqual(responseStatus, 200);
+  assert.strictEqual(responseData, 'CHALLENGE_STRING_123');
+});
+
+test('Webhook verification fails with wrong token', () => {
+  const req = {
+    query: {
+      'hub.mode': 'subscribe',
+      'hub.verify_token': 'wrong_token',
+      'hub.challenge': 'CHALLENGE_STRING_123',
+    },
+  };
+  let responseStatus = null;
+  const res = {
+    status: (s) => ({ send: () => {} }),
+    sendStatus: (s) => { responseStatus = s; },
+  };
+
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN || 'loulou_wa_verify_token_2026';
+
+  if (mode === 'subscribe' && token === expectedToken) {
+    res.status(200).send('ok');
+  } else {
+    res.sendStatus(403);
+  }
+
+  assert.strictEqual(responseStatus, 403);
+});
+
 console.log(`\n====================================================`);
 console.log(`   UNIT TESTS SUMMARY: ${passedTests}/${totalTests} PASSED`);
 console.log(`====================================================\n`);

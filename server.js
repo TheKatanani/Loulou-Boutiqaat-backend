@@ -79,6 +79,8 @@ app.use('/category', require('./router/api/category.js'))
 app.use('/social', require('./router/api/social.js'))
 app.use('/catalog', require('./router/api/catalog.js'))
 app.use('/order', require('./router/api/order.js'))
+app.use('/webhook', require('./router/api/webhook.js'))
+app.use('/api/webhook/whatsapp', require('./router/api/webhook.js'))
 
 // Any route under this line must verify by JWT
 app.use(verifyJWT)
