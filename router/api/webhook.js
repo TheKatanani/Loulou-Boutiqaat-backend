@@ -78,7 +78,15 @@ router.post('/', async (req, res) => {
       const changes = entry.changes || [];
       for (const change of changes) {
         const value = change.value;
-        if (!value || !value.messages) continue;
+        if (!value) continue;
+
+        if (value.statuses) {
+          for (const st of value.statuses) {
+            console.log(`[WhatsApp Status Event] ID: ${st.id} -> ${st.status}`, st.errors || '');
+          }
+        }
+
+        if (!value.messages) continue;
         const metadataPhoneId = value.metadata?.phone_number_id;
 
         for (const msg of value.messages) {
