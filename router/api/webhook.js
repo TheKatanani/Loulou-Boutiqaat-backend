@@ -26,9 +26,9 @@ router.get('/', (req, res) => {
 /**
  * Helper to send a text reply back via WhatsApp Cloud API
  */
-const sendWhatsAppReply = async (to, text) => {
+const sendWhatsAppReply = async (to, text, incomingPhoneId) => {
   const token = process.env.WHATSAPP_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1354896104379181';
+  const phoneId = incomingPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1369538319580887';
 
   if (!token || !phoneId) {
     console.log('[WhatsApp Reply Skipped] WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set.');
@@ -79,6 +79,7 @@ router.post('/', async (req, res) => {
       for (const change of changes) {
         const value = change.value;
         if (!value || !value.messages) continue;
+        const metadataPhoneId = value.metadata?.phone_number_id;
 
         for (const msg of value.messages) {
           const from = msg.from; // e.g. "970592263808"
@@ -109,7 +110,8 @@ router.post('/', async (req, res) => {
                   if (isExpired || order.orderStatus === 'expired') {
                     await sendWhatsAppReply(
                       from,
-                      `عذراً، حجز الطلب ${orderCode} انتهت صلاحيته (تجاوزت الـ 60 دقيقة). يمكنكِ إعادة اختيار المنتجات من المتجر في أي وقت! 🌸`
+                      `عذراً، حجز الطلب ${orderCode} انتهت صلاحيته (تجاوزت الـ 60 دقيقة). يمكنكِ إعادة اختيار المنتجات من المتجر في أي وقت! 🌸`,
+                      metadataPhoneId
                     );
                   } else {
                     // Update customer phone if missing, keep status as pending_whatsapp (no auto-confirm, no double stock deduction!)
@@ -121,7 +123,8 @@ router.post('/', async (req, res) => {
 
                     await sendWhatsAppReply(
                       from,
-                      `أهلاً بكِ في متجر لولو بوتيكات! 🌸\nتم استلام رسالتكِ للطلب المعتمد (${orderCode}) بنجاح. طلبكِ قيد المراجعة لدى الإدارة لتأكيد موعد التوصيل والتواصل معكِ. شكراً لتسوقكِ معنا! ✨`
+                      `أهلاً بكِ في متجر لولو بوتيكات! 🌸\nتم استلام رسالتكِ للطلب المعتمد (${orderCode}) بنجاح. طلبكِ قيد المراجعة لدى الإدارة لتأكيد موعد التوصيل والتواصل معكِ. شكراً لتسوقكِ معنا! ✨`,
+                      metadataPhoneId
                     );
                   }
                 } else {
@@ -152,13 +155,15 @@ router.post('/', async (req, res) => {
 
                 await sendWhatsAppReply(
                   from,
-                  `أهلاً بكِ! 🌸 تم استلام طلبكِ من الكتالوج وحجز المنتجات برقم معتمد (${draft.orderCode}) بإجمالي ${draft.totalCost} ₪.\nطلبكِ قيد المراجعة لدى الإدارة لتأكيد التوصيل.`
+                  `أهلاً بكِ! 🌸 تم استلام طلبكِ من الكتالوج وحجز المنتجات برقم معتمد (${draft.orderCode}) بإجمالي ${draft.totalCost} ₪.\nطلبكِ قيد المراجعة لدى الإدارة لتأكيد التوصيل.`,
+                  metadataPhoneId
                 );
               } catch (stockErr) {
                 console.error('[WhatsApp Catalog Order Failed]', stockErr.message);
                 await sendWhatsAppReply(
                   from,
-                  `عذراً، تعذر إتمام الطلب: ${stockErr.message}`
+                  `عذراً، تعذر إتمام الطلب: ${stockErr.message}`,
+                  metadataPhoneId
                 );
               }
             }
