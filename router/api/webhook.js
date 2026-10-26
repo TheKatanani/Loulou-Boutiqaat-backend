@@ -28,7 +28,7 @@ router.get('/', (req, res) => {
  */
 const sendWhatsAppReply = async (to, text) => {
   const token = process.env.WHATSAPP_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1354896104379181';
 
   if (!token || !phoneId) {
     console.log('[WhatsApp Reply Skipped] WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set.');
