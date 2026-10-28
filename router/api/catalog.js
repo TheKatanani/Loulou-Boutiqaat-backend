@@ -138,7 +138,7 @@ router.get('/summary', async (req, res) => {
   try {
     const products = await getCatalogProducts();
     const siteUrl = 'https://loulou-boutiqaat.vercel.app';
-    const waNumber = '972597229340';
+    const waNumber = '972592263808';
 
     const items = products.map((p) => {
       const images = parseImages(p.images);
