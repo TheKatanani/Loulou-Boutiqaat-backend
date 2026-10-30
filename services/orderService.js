@@ -25,15 +25,26 @@ const lockAndDeductStock = async (normalizedItems, { t = null } = {}) => {
 
   if (db.isConnected) {
     const Product = db.products;
+    const expandedIds = [
+      ...new Set([
+        ...productIds,
+        ...productIds.filter((id) => id >= 112 && id <= 118).map((id) => id - 111),
+      ]),
+    ];
     const dbProducts = await Product.findAll({
-      where: { id: productIds },
+      where: { id: expandedIds },
       lock: t ? t.LOCK.UPDATE : false,
       transaction: t,
       order: [['id', 'ASC']],
     });
 
     const productMap = new Map();
-    dbProducts.forEach((p) => productMap.set(p.id, p));
+    dbProducts.forEach((p) => {
+      productMap.set(p.id, p);
+      if (p.id >= 1 && p.id <= 7) {
+        productMap.set(p.id + 111, p); // Support Meta Catalog Content ID aliases (112..118)
+      }
+    });
 
     const outOfStockErrors = [];
 
@@ -105,7 +116,9 @@ const lockAndDeductStock = async (normalizedItems, { t = null } = {}) => {
     const outOfStockErrors = [];
 
     for (const item of sortedItems) {
-      const prod = mockProducts.find((p) => p.id === item.productId);
+      const prod = mockProducts.find(
+        (p) => p.id === item.productId || (item.productId >= 112 && p.id === item.productId - 111)
+      );
       if (!prod) {
         throw new Error(`المنتج رقم #${item.productId} غير موجود بالمتجر`);
       }
@@ -136,7 +149,9 @@ const lockAndDeductStock = async (normalizedItems, { t = null } = {}) => {
     }
 
     for (const item of sortedItems) {
-      const prod = mockProducts.find((p) => p.id === item.productId);
+      const prod = mockProducts.find(
+        (p) => p.id === item.productId || (item.productId >= 112 && p.id === item.productId - 111)
+      );
       prod.stock = (prod.stock || 0) - item.quantity;
 
       const lineTotal = Number(prod.price) * item.quantity;

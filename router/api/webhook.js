@@ -145,8 +145,17 @@ router.post('/', async (req, res) => {
           // B) Native WhatsApp Catalog Order
           if (msgType === 'order') {
             const catalogOrder = msg.order;
+            const normalizeCatalogProductId = (rawId) => {
+              const id = Number(rawId);
+              // Meta Commerce Catalog maps products with IDs 112..118 to DB products 1..7
+              if (id >= 112 && id <= 118) {
+                return id - 111;
+              }
+              return id;
+            };
+
             const items = (catalogOrder?.product_items || []).map((i) => ({
-              productId: Number(i.product_retailer_id),
+              productId: normalizeCatalogProductId(i.product_retailer_id),
               quantity: Number(i.quantity) || 1,
             }));
 
