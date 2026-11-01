@@ -31,7 +31,9 @@ app.use(credentials)
 app.use(cors(corsOptions))
 
 // Middleware to handle urlencoded and json data (built into Express)
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '50mb', verify: (req, res, buffer) => {
+  if (req.originalUrl.startsWith('/webhook') || req.originalUrl.startsWith('/api/webhook/whatsapp')) req.rawBody = Buffer.from(buffer);
+} }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Middleware for cookies
@@ -81,6 +83,7 @@ app.use('/catalog', require('./router/api/catalog.js'))
 app.use('/order', require('./router/api/order.js'))
 app.use('/webhook', require('./router/api/webhook.js'))
 app.use('/api/webhook/whatsapp', require('./router/api/webhook.js'))
+app.use('/whatsapp', require('./router/api/whatsappInbox').createRouter(require('./services/whatsappInbox')))
 
 // Any route under this line must verify by JWT
 app.use(verifyJWT)
@@ -122,5 +125,9 @@ const { cleanupExpiredDrafts } = require('./services/orderService');
     setInterval(() => {
       cleanupExpiredDrafts().catch((e) => console.error('Interval cleanup error:', e.message));
     }, 60 * 1000);
+    const inbox = require('./services/whatsappInbox');
+    const runInbox = () => inbox.processPending().catch(error => console.error('WhatsApp processing:', error.message));
+    runInbox();
+    setInterval(runInbox, 15000);
   });
 })();

@@ -5,9 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test:unit": "node test/unit/orderUnit.test.js",
+    "test:unit": "node test/unit/orderUnit.test.js && node --test test/unit/whatsappInbox.test.js",
+    "test:inbox": "node --test test/integration/whatsappInbox.test.js",
     "test:integration": "node test/integration/orderIntegration.test.js",
-    "test": "node test/unit/orderUnit.test.js && node test/integration/orderIntegration.test.js",
+    "test": "npm run test:unit && node test/integration/orderIntegration.test.js && npm run test:inbox",
     "build": "echo 'Build complete'",
     "dev": "nodemon server.js",
     "seed": "node seed.js"

@@ -89,6 +89,8 @@ db.category = require('./category.js')(sequelize, Sequelize.DataTypes);
 db.countryCode = require('./countryCode.js')(sequelize, Sequelize.DataTypes);
 db.social = require('./social.js')(sequelize, Sequelize.DataTypes);
 db.order = require('./order.js')(sequelize, Sequelize.DataTypes);
+db.whatsappConversation = require('./whatsappConversation.js')(sequelize, Sequelize.DataTypes);
+db.whatsappMessage = require('./whatsappMessage.js')(sequelize, Sequelize.DataTypes);
 
 // Map capitalized names so model associations (e.g. models.Category, models.Product) resolve correctly
 db.User = db.users;

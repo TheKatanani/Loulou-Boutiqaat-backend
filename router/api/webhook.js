@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../../models');
 const orderService = require('../../services/orderService');
+const inbox = require('../../services/whatsappInbox');
+const { createInboxWebhook } = require('../../middleware/whatsappInboxWebhook');
 
 /**
  * 1. Webhook Verification Endpoint (GET)
@@ -65,7 +67,7 @@ const sendWhatsAppReply = async (to, text, incomingPhoneId) => {
  * 2. Incoming Messages & Events Endpoint (POST)
  * Handles customer replies holding web order code #LB-xxx & native catalog orders.
  */
-router.post('/', async (req, res) => {
+router.post('/', createInboxWebhook(inbox), async (req, res) => {
   try {
     const body = req.body;
 
