@@ -147,11 +147,15 @@ const updateProduct = async (req, res) => {
     }
 
     // Only allow updating general attributes; stock is strictly protected from stale overwrite
-    const allowedFields = ['name', 'description', 'price', 'prevPrice', 'images', 'stars', 'categoryId', 'published'];
+    const allowedFields = ['name', 'description', 'price', 'prevPrice', 'unitCost', 'images', 'stars', 'categoryId', 'published'];
     const updateData = {};
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
+        if (field === 'unitCost') {
+          updateData[field] = req.body[field] !== '' && req.body[field] !== null ? Number(req.body[field]) : null;
+        } else {
+          updateData[field] = req.body[field];
+        }
       }
     });
 
@@ -165,7 +169,7 @@ const updateProduct = async (req, res) => {
         id
       }
     });
-    res.json(formatProduct(product));
+    res.json(formatProduct(product, true));
   } catch (err) {
     res.status(400).json({
       message: err?.message || err
