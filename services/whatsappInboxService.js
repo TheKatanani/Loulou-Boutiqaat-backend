@@ -117,7 +117,7 @@ const createWhatsAppInbox = ({ db, orderService, getConfig = getWhatsAppConfig,
     }
   };
 
-  const send = async (conversationId, { text = '', clientRequestId, sentByUserId = null, attachment = null }) => {
+  const send = async (conversationId, { text = '', clientRequestId, sentByUserId = null, attachment = null, bypassAutomationPaused = false }) => {
     const config = ready();
     if (!/^[a-zA-Z0-9:_-]{8,160}$/.test(clientRequestId || '')) throw fail('مفتاح محاولة الإرسال مطلوب');
     const conversation = await getConversation(conversationId);
@@ -134,7 +134,7 @@ const createWhatsAppInbox = ({ db, orderService, getConfig = getWhatsAppConfig,
       return existing;
     }
     if (!canReply(conversation, now())) throw fail('انتهت نافذة الرد العادي (24 ساعة). يلزم أن يراسلك العميل مجدداً أو إرسال قالب معتمد.', 409);
-    if (!sentByUserId && conversation.automationPaused) return null;
+    if (!sentByUserId && !bypassAutomationPaused && conversation.automationPaused) return null;
     let message;
     try {
       message = await Message.create({ conversationId: conversation.id, clientRequestId, payload: content,
@@ -222,7 +222,10 @@ const createWhatsAppInbox = ({ db, orderService, getConfig = getWhatsAppConfig,
       } else reply = `أهلاً بكِ! 🌸 وصلت رسالتكِ بخصوص الطلب ${order.orderCode}. سيتابع فريق المتجر معكِ لتأكيد التوصيل.`;
     }
     if (reply) {
-      const result = await send(conversation.id, { text: reply,
+      if (msg.type === 'order') {
+        await conversation.update({ automationPaused: false });
+      }
+      const result = await send(conversation.id, { text: reply, bypassAutomationPaused: true,
         clientRequestId: (businessError ? 'auto-err:' : 'auto:') + crypto.createHash('sha256').update(message.metaMessageId).digest('hex') });
       if (result?.status === 'failed') throw fail(result.error);
     }
