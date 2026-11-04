@@ -17,6 +17,7 @@ const credentials = require('./middleware/credentials.js')
 
 const app = express()
 const PORT = process.env.PORT || 3500
+let inventoryReady = process.env.NODE_ENV !== 'production' && !process.env.RENDER_GIT_COMMIT
 
 // Required on Render / reverse proxies for secure cross-site cookies & accurate client IP
 app.set('trust proxy', 1)
@@ -52,7 +53,17 @@ app.get('/health', (req, res) => {
     database: db.isConnected ? 'connected' : 'disconnected',
     commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'e4cf833',
     databaseTarget: db.sequelize?.config?.database || 'unknown',
+    inventoryCutover: inventoryReady ? 'ready' : 'waiting',
     timestamp: new Date().toISOString()
+  });
+});
+
+app.use((req, res, next) => {
+  if (inventoryReady) return next();
+  res.set('Retry-After', '30');
+  return res.status(503).json({
+    status: 'inventory_cutover',
+    message: 'المتجر في صيانة مؤقتة لتحديث المخزون. يرجى المحاولة بعد قليل.',
   });
 });
 
@@ -109,6 +120,34 @@ app.use(errorHandler)
 
 const db = require('./models');
 const { cleanupExpiredDrafts } = require('./services/orderService');
+const { keyPrefix } = require('./scripts/reconcileOpeningStock');
+
+function startWorkers() {
+  const cleanup = () => cleanupExpiredDrafts().catch(err => console.error('Order cleanup:', err.message));
+  const inbox = require('./services/whatsappInbox');
+  const runInbox = () => inbox.processPending().catch(err => console.error('WhatsApp processing:', err.message));
+  cleanup();
+  runInbox();
+  setInterval(cleanup, 60000);
+  setInterval(runInbox, 15000);
+}
+
+async function waitForOpeningInventory() {
+  try {
+    const [[row]] = await db.sequelize.query(
+      "SELECT (NOT EXISTS (SELECT 1 FROM Products) OR EXISTS (SELECT 1 FROM StockMovements WHERE movementType = 'opening_balance' AND idempotencyKey LIKE :prefix)) AS ready",
+      { replacements: { prefix: keyPrefix + '%' } }
+    );
+    if (Number(row.ready) === 1) {
+      inventoryReady = true;
+      startWorkers();
+      return;
+    }
+  } catch (err) {
+    console.error('Inventory cutover check:', err.message);
+  }
+  setTimeout(waitForOpeningInventory, 5000);
+}
 
 (async () => {
   // Await database connection & schema sync BEFORE opening the listening port
@@ -122,13 +161,7 @@ const { cleanupExpiredDrafts } = require('./services/orderService');
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Loulou Boutiqaat backend listening on 0.0.0.0:${PORT} [DB: ${db.sequelize?.config?.database || 'unknown'}]`);
-    cleanupExpiredDrafts().catch((e) => console.error('Initial cleanup error:', e.message));
-    setInterval(() => {
-      cleanupExpiredDrafts().catch((e) => console.error('Interval cleanup error:', e.message));
-    }, 60 * 1000);
-    const inbox = require('./services/whatsappInbox');
-    const runInbox = () => inbox.processPending().catch(error => console.error('WhatsApp processing:', error.message));
-    runInbox();
-    setInterval(runInbox, 15000);
+    if (inventoryReady) startWorkers();
+    else waitForOpeningInventory();
   });
 })();
