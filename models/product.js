@@ -34,6 +34,25 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       allowNull: false
+    },
+    physicalStock: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false
+    },
+    reservedStock: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false
+    },
+    unitCost: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: null
+    },
+    isArchived: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
     }
   });
 
@@ -52,6 +71,10 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'productId',
       targetKey: 'id',
       as: 'saved'
+    });
+    Product.hasMany(models.StockMovement, {
+      foreignKey: 'productId',
+      as: 'stockMovements'
     });
   };
 

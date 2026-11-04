@@ -84,6 +84,7 @@ app.use('/order', require('./router/api/order.js'))
 app.use('/webhook', require('./router/api/webhook.js'))
 app.use('/api/webhook/whatsapp', require('./router/api/webhook.js'))
 app.use('/whatsapp', require('./router/api/whatsappInbox').createRouter(require('./services/whatsappInbox')))
+app.use('/inventory', require('./router/api/inventory.js'))
 
 // Any route under this line must verify by JWT
 app.use(verifyJWT)

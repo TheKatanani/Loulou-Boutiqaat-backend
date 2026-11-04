@@ -3,6 +3,15 @@ const {
 } = require('sequelize');
 const db = require('../models');
 const Product = db.products;
+const { inventoryService } = require('../services/inventoryService');
+const ROLES_LIST = require('../config/roles_list');
+
+const isStaffRequest = (req) => {
+  if (!req || !req.roles) return false;
+  const roles = Array.isArray(req.roles) ? req.roles : (typeof req.roles === 'object' ? Object.values(req.roles) : [req.roles]);
+  const numRoles = roles.map(Number);
+  return numRoles.includes(ROLES_LIST.ADMIN) || numRoles.includes(ROLES_LIST.EDITOR);
+};
 
 const parseImages = (images) => {
   if (!images) return [];
@@ -18,22 +27,31 @@ const parseImages = (images) => {
   return [images];
 };
 
-const formatProduct = (product) => {
+const formatProduct = (product, isStaff = false) => {
   if (!product) return product;
   const p = product.dataValues ? { ...product.dataValues } : { ...product };
   p.images = parseImages(p.images);
   p.stock = typeof p.stock === 'number' ? p.stock : 25;
+
+  // Keep purchasing & physical inventory valuation private from non-admin/editor users
+  if (!isStaff) {
+    delete p.unitCost;
+    delete p.physicalStock;
+    delete p.reservedStock;
+    delete p.isArchived;
+  }
   return p;
 };
 
 const getProducts = async (req, res) => {
+  const isStaff = isStaffRequest(req);
   const {
     name_like,
     categoryId
   } = req.query;
 
   if (!db.isConnected) {
-    let prods = (db.mockData.mockProducts || []).map(formatProduct);
+    let prods = (db.mockData.mockProducts || []).map((p) => formatProduct(p, isStaff));
     if (categoryId) {
       prods = prods.filter(p => p.categoryId == categoryId);
     }
@@ -44,34 +62,16 @@ const getProducts = async (req, res) => {
   }
 
   try {
-    let products;
-    if (categoryId && name_like) {
-      products = await Product.findAll({
-        where: {
-          name: {
-            [Op.substring]: name_like,
-          },
-          categoryId
-        }
-      });
-    } else if (categoryId) {
-      products = await Product.findAll({
-        where: { 
-          categoryId
-        }
-      });
-    } else if (name_like) {
-      products = await Product.findAll({
-        where: {
-          name: {
-            [Op.substring]: name_like,
-          } 
-        }
-      });
-    } else {
-      products = await Product.findAll();
+    const where = { isArchived: false };
+    if (name_like) {
+      where.name = { [Op.substring]: name_like };
     }
-    const newProducts = (products || []).map(formatProduct);
+    if (categoryId) {
+      where.categoryId = categoryId;
+    }
+
+    const products = await Product.findAll({ where });
+    const newProducts = (products || []).map((p) => formatProduct(p, isStaff));
     res.status(200).send(newProducts);
   } catch (err) {
     res.status(400).json({
@@ -99,10 +99,32 @@ const addProduct = async (req, res) => {
     categoryId: req.body?.categoryId,
     published: req.body?.published !== undefined ? req.body.published : false,
     stock,
+    physicalStock: stock,
+    reservedStock: 0,
+    unitCost: req.body?.unitCost != null ? Number(req.body.unitCost) : null,
+    isArchived: false,
   };
   try {
     const product = await Product.create(info);
-    res.status(201).json(formatProduct(product));
+    if (db.isConnected && db.StockMovement && stock > 0) {
+      await db.StockMovement.create({
+        productId: product.id,
+        movementType: 'opening_balance',
+        quantity: stock,
+        unitCost: info.unitCost,
+        totalCost: info.unitCost != null ? Number((stock * info.unitCost).toFixed(2)) : null,
+        physicalBefore: 0,
+        physicalAfter: stock,
+        reservedBefore: 0,
+        reservedAfter: 0,
+        availableBefore: 0,
+        availableAfter: stock,
+        unitCostBefore: null,
+        unitCostAfter: info.unitCost,
+        notes: 'رصيد افتتاحي عند إضافة المنتج',
+      }).catch(() => {});
+    }
+    res.status(201).json(formatProduct(product, true));
   } catch (err) {
     res.status(400).json({
       message: err?.message || err
@@ -168,9 +190,10 @@ const isStrictInteger = (val) => {
  * Rejects non-integers, enforces expectedStock on absolute updates, and rejects negative stock on deltas
  */
 const updateProductStock = async (req, res) => {
+  const isStaff = isStaffRequest(req);
   const id = req.params.id;
   try {
-    const { stock, delta, expectedStock } = req.body;
+    const { stock, delta, expectedStock, unitCost, notes } = req.body;
 
     if (delta !== undefined && stock !== undefined) {
       return res.status(400).json({ message: 'يرجى إرسال إما التغيير النسبي (delta) أو المخزون المطلق (stock) وليس كلاهما' });
@@ -186,32 +209,46 @@ const updateProductStock = async (req, res) => {
       }
 
       if (db.isConnected) {
-        let updatedItem;
-        await db.sequelize.transaction(async (t) => {
-          const item = await Product.findOne({
-            where: { id },
-            lock: t.LOCK.UPDATE,
-            transaction: t,
-          });
-          if (!item) {
-            const err = new Error('المنتج غير موجود');
-            err.statusCode = 404;
-            throw err;
+        return await db.sequelize.transaction(async (t) => {
+          if (deltaNum > 0) {
+            const result = await inventoryService.receiveStock({
+              productId: id,
+              quantity: deltaNum,
+              unitCost,
+              userId: req.user,
+              notes: notes || 'تحديث المخزون (إضافة)',
+              transaction: t,
+            });
+            return res.json(formatProduct(result.product, isStaff));
+          } else {
+            // Negative delta adjustment under atomic lock
+            const item = await Product.findByPk(id, {
+              lock: t.LOCK.UPDATE,
+              transaction: t,
+            });
+            if (!item) {
+              const err = new Error('المنتج غير موجود');
+              err.statusCode = 404;
+              throw err;
+            }
+            const curPhys = Number(item.physicalStock) || 0;
+            const resv = Number(item.reservedStock) || 0;
+            const newPhys = curPhys + deltaNum;
+            if (newPhys < resv) {
+              const err = new Error(`لا يمكن خفض المخزون لأقل من الكميات المحجوزة حالياً (${resv} قطعة)`);
+              err.statusCode = 400;
+              throw err;
+            }
+            const result = await inventoryService.adjustStock({
+              productId: id,
+              newPhysical: newPhys,
+              reason: notes || `تعديل نسبي للمخزون (${deltaNum})`,
+              userId: req.user,
+              transaction: t,
+            });
+            return res.json(formatProduct(result.product, isStaff));
           }
-
-          const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 0;
-          const newStock = currentStock + deltaNum;
-          if (newStock < 0) {
-            const err = new Error(`لا يمكن أن يصبح المخزون سالباً: المخزون الحالي ${currentStock} والتغيير المطلوب ${deltaNum}`);
-            err.statusCode = 400;
-            throw err;
-          }
-
-          await item.update({ stock: newStock }, { transaction: t });
-          updatedItem = item;
         });
-
-        return res.json(formatProduct(updatedItem));
       } else {
         const item = (db.mockData?.mockProducts || []).find((p) => Number(p.id) === Number(id));
         if (!item) return res.status(404).json({ message: 'المنتج غير موجود' });
@@ -221,7 +258,7 @@ const updateProductStock = async (req, res) => {
           return res.status(400).json({ message: `لا يمكن أن يصبح المخزون سالباً: المخزون الحالي ${currentStock} والتغيير المطلوب ${deltaNum}` });
         }
         item.stock = newStock;
-        return res.json(formatProduct(item));
+        return res.json(formatProduct(item, isStaff));
       }
     }
 
@@ -238,10 +275,8 @@ const updateProductStock = async (req, res) => {
       const expStock = Number(expectedStock);
 
       if (db.isConnected) {
-        let updatedItem;
-        await db.sequelize.transaction(async (t) => {
-          const item = await Product.findOne({
-            where: { id },
+        return await db.sequelize.transaction(async (t) => {
+          const item = await Product.findByPk(id, {
             lock: t.LOCK.UPDATE,
             transaction: t,
           });
@@ -251,19 +286,30 @@ const updateProductStock = async (req, res) => {
             throw err;
           }
 
-          const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 0;
-          if (currentStock !== expStock) {
-            const err = new Error(`تعارض في تحديث المخزون: تغير المخزون في هذه الأثناء ليصبح ${currentStock} قطعة بدلاً من ${expStock}`);
-            err.statusCode = 409;
-            err.currentStock = currentStock;
-            throw err;
+          const currentAvailable = item.stock !== undefined && item.stock !== null ? Number(item.stock) : 0;
+          if (currentAvailable !== expStock) {
+            const conflictErr = new Error(
+              `تعارض في تحديث المخزون: تغير المخزون في هذه الأثناء ليصبح ${currentAvailable} قطعة بدلاً من ${expStock}`
+            );
+            conflictErr.statusCode = 409;
+            conflictErr.currentStock = currentAvailable;
+            throw conflictErr;
           }
 
-          await item.update({ stock: targetStock }, { transaction: t });
-          updatedItem = item;
-        });
+          const reserved = Number(item.reservedStock) || 0;
+          const targetPhysical = targetStock + reserved;
 
-        return res.json(formatProduct(updatedItem));
+          const result = await inventoryService.adjustStock({
+            productId: id,
+            newPhysical: targetPhysical,
+            expectedStock: expStock,
+            reason: notes || `تسوية جردية للمخزون المتاح إلى ${targetStock} قطعة`,
+            userId: req.user,
+            transaction: t,
+          });
+
+          return res.json(formatProduct(result.product, isStaff));
+        });
       } else {
         const item = (db.mockData?.mockProducts || []).find((p) => Number(p.id) === Number(id));
         if (!item) return res.status(404).json({ message: 'المنتج غير موجود' });
@@ -275,7 +321,7 @@ const updateProductStock = async (req, res) => {
           });
         }
         item.stock = targetStock;
-        return res.json(formatProduct(item));
+        return res.json(formatProduct(item, isStaff));
       }
     }
 
@@ -298,10 +344,9 @@ const deleteProduct = async (req, res) => {
       }
     });
     if (foundedItem) {
-      await Product.destroy({
-        where: {
-          id
-        }
+      await foundedItem.update({
+        isArchived: true,
+        published: false,
       });
       res.status(200).json({
         message: 'Product is deleted!'
@@ -319,18 +364,20 @@ const deleteProduct = async (req, res) => {
 };
 
 const getProduct = async (req, res) => {
+  const isStaff = isStaffRequest(req);
   const id = req.params.id;
   if (!db.isConnected) {
-    const p = db.mockData.mockProducts.find(item => item.id == id);
+    const p = db.mockData.mockProducts.find(item => item.id == id && !item.isArchived);
     if (!p) {
       return res.status(404).json({ message: 'Product not found' });
     }
-    return res.status(200).json(formatProduct(p));
+    return res.status(200).json(formatProduct(p, isStaff));
   }
   try {
     let product = await Product.findOne({
       where: {
-        id: id
+        id: id,
+        isArchived: false,
       }
     });
     if (!product) {
@@ -338,7 +385,7 @@ const getProduct = async (req, res) => {
         message: 'Product not found'
       });
     }
-    res.status(200).json(formatProduct(product));
+    res.status(200).json(formatProduct(product, isStaff));
   } catch (err) {
     res.status(400).json({
       message: err?.message || err
@@ -347,16 +394,18 @@ const getProduct = async (req, res) => {
 };
 
 const getPublishedProducts = async (req, res) => {
+  const isStaff = isStaffRequest(req);
   if (!db.isConnected) {
-    return res.status(200).json((db.mockData.mockProducts || []).filter(p => p.published).map(formatProduct));
+    return res.status(200).json((db.mockData.mockProducts || []).filter(p => p.published && !p.isArchived).map(p => formatProduct(p, isStaff)));
   }
   try {
     let products = await Product.findAll({
       where: {
         published: true,
+        isArchived: false,
       }
     });
-    const newProducts = (products || []).map(formatProduct);
+    const newProducts = (products || []).map(p => formatProduct(p, isStaff));
     res.status(200).json(newProducts);
   } catch (err) {
     res.status(400).json({

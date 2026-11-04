@@ -79,10 +79,15 @@ const lockAndDeductStock = async (normalizedItems, { t = null } = {}) => {
       );
     }
 
-    // Deduct stock and build invoice snapshot
+    // Deduct available stock, increment reserved stock, and build invoice snapshot
     for (const item of sortedItems) {
       const prod = productMap.get(item.productId);
       await Product.decrement('stock', {
+        by: item.quantity,
+        where: { id: prod.id },
+        transaction: t,
+      });
+      await Product.increment('reservedStock', {
         by: item.quantity,
         where: { id: prod.id },
         transaction: t,
@@ -180,7 +185,7 @@ const lockAndDeductStock = async (normalizedItems, { t = null } = {}) => {
  * Restores reserved stock back to products table
  * MUST throw if update fails so outer transaction rolls back.
  */
-const restoreStock = async (items, { t = null } = {}) => {
+const restoreStock = async (items, { t = null, orderId = null, orderCode = null } = {}) => {
   if (!items || !Array.isArray(items) || items.length === 0) return;
 
   if (db.isConnected) {
@@ -188,12 +193,54 @@ const restoreStock = async (items, { t = null } = {}) => {
     for (const item of items) {
       const pId = Number(item.productId || item.id);
       const qty = Number(item.quantity || item.count) || 1;
-      if (!pId) continue;
-      await Product.increment('stock', {
-        by: qty,
-        where: { id: pId },
+      if (!pId || qty <= 0) continue;
+
+      const prod = await Product.findByPk(pId, {
+        lock: t ? t.LOCK.UPDATE : false,
         transaction: t,
       });
+      if (!prod) continue;
+
+      const physBefore = Number(prod.physicalStock) || 0;
+      const resBefore = Number(prod.reservedStock) || 0;
+      const availBefore = Number(prod.stock) || 0;
+      const costVal = prod.unitCost != null ? Number(prod.unitCost) : null;
+
+      const resAfter = Math.max(0, resBefore - qty);
+      const availAfter = availBefore + qty;
+
+      await prod.update(
+        {
+          reservedStock: resAfter,
+          stock: availAfter,
+        },
+        { transaction: t }
+      );
+
+      if (db.StockMovement) {
+        await db.StockMovement.create(
+          {
+            productId: prod.id,
+            movementType: 'reservation_release',
+            quantity: qty,
+            unitCost: costVal,
+            totalCost: costVal != null ? Number((qty * costVal).toFixed(2)) : null,
+            physicalBefore: physBefore,
+            physicalAfter: physBefore,
+            reservedBefore: resBefore,
+            reservedAfter: resAfter,
+            availableBefore: availBefore,
+            availableAfter: availAfter,
+            unitCostBefore: costVal,
+            unitCostAfter: costVal,
+            orderId,
+            orderCode,
+            createdByUserId: null,
+            notes: `إلغاء حجز الطلب ${orderCode || ''}: إعادة ${qty} قطعة للمتاح`,
+          },
+          { transaction: t }
+        );
+      }
     }
   } else {
     const mockProducts = db.mockData.mockProducts;
@@ -203,6 +250,7 @@ const restoreStock = async (items, { t = null } = {}) => {
       const prod = mockProducts.find((p) => p.id === pId);
       if (prod) {
         prod.stock = (prod.stock || 0) + qty;
+        prod.reservedStock = Math.max(0, (prod.reservedStock || 0) - qty);
       }
     }
   }
@@ -394,6 +442,39 @@ const createWhatsAppDraft = async ({
       const orderCode = `#LB-${order.id}`;
       await order.update({ orderCode }, { transaction: t });
 
+      if (db.StockMovement) {
+        for (const item of snapshot) {
+          const prod = await db.products.findByPk(item.productId, { transaction: t });
+          const costVal = prod?.unitCost != null ? Number(prod.unitCost) : null;
+          const physVal = Number(prod?.physicalStock) || 0;
+          const resVal = Number(prod?.reservedStock) || 0;
+          const availVal = Number(prod?.stock) || 0;
+
+          await db.StockMovement.create(
+            {
+              productId: item.productId,
+              movementType: 'reservation',
+              quantity: -item.quantity,
+              unitCost: costVal,
+              totalCost: costVal != null ? Number((item.quantity * costVal).toFixed(2)) : null,
+              physicalBefore: physVal,
+              physicalAfter: physVal,
+              reservedBefore: Math.max(0, resVal - item.quantity),
+              reservedAfter: resVal,
+              availableBefore: availVal + item.quantity,
+              availableAfter: availVal,
+              unitCostBefore: costVal,
+              unitCostAfter: costVal,
+              orderId: order.id,
+              orderCode,
+              createdByUserId: null,
+              notes: `حجز للطلب ${orderCode}: ${item.quantity} قطعة`,
+            },
+            { transaction: t }
+          );
+        }
+      }
+
       await t.commit();
 
       const waUrl = generateWhatsAppLink({
@@ -558,6 +639,39 @@ const createWebOrder = async ({
       const orderCode = `#LB-${order.id}`;
       await order.update({ orderCode }, { transaction: t });
 
+      if (db.StockMovement) {
+        for (const item of snapshot) {
+          const prod = await db.products.findByPk(item.productId, { transaction: t });
+          const costVal = prod?.unitCost != null ? Number(prod.unitCost) : null;
+          const physVal = Number(prod?.physicalStock) || 0;
+          const resVal = Number(prod?.reservedStock) || 0;
+          const availVal = Number(prod?.stock) || 0;
+
+          await db.StockMovement.create(
+            {
+              productId: item.productId,
+              movementType: 'reservation',
+              quantity: -item.quantity,
+              unitCost: costVal,
+              totalCost: costVal != null ? Number((item.quantity * costVal).toFixed(2)) : null,
+              physicalBefore: physVal,
+              physicalAfter: physVal,
+              reservedBefore: Math.max(0, resVal - item.quantity),
+              reservedAfter: resVal,
+              availableBefore: availVal + item.quantity,
+              availableAfter: availVal,
+              unitCostBefore: costVal,
+              unitCostAfter: costVal,
+              orderId: order.id,
+              orderCode,
+              createdByUserId: null,
+              notes: `حجز للطلب ${orderCode}: ${item.quantity} قطعة`,
+            },
+            { transaction: t }
+          );
+        }
+      }
+
       await t.commit();
       return sanitizeOrder(order);
     } catch (err) {
@@ -705,7 +819,7 @@ const cancelOrExpireOrder = async (orderId, targetStatus = 'cancelled') => {
         order.inventoryTracked === true
       ) {
         const items = typeof order.orders === 'string' ? JSON.parse(order.orders) : order.orders;
-        await restoreStock(items, { t });
+        await restoreStock(items, { t, orderId: order.id, orderCode: order.orderCode });
       }
 
       await order.update(
@@ -766,7 +880,7 @@ const cancelOrExpireOrder = async (orderId, targetStatus = 'cancelled') => {
  * confirmed -> delivered | cancelled
  */
 const updateOrderStatus = async (orderId, newStatus) => {
-  const allowed = ['pending_whatsapp', 'confirmed', 'delivered', 'cancelled', 'expired'];
+  const allowed = ['pending_whatsapp', 'confirmed', 'delivered', 'cancelled', 'expired', 'returned'];
   if (!allowed.includes(newStatus)) {
     throw new Error(`حالة غير مقبولة: ${newStatus}`);
   }
@@ -790,8 +904,12 @@ const updateOrderStatus = async (orderId, newStatus) => {
         throw new Error('لا يمكن إعادة تأكيد أو تسليم طلب ملغي أو منتهي الصلاحية');
       }
 
-      if (order.orderStatus === 'delivered' && newStatus !== 'delivered') {
-        throw new Error('لا يمكن تعديل حالة طلب تم تسليمه');
+      if (order.orderStatus === 'delivered' && newStatus !== 'delivered' && newStatus !== 'returned') {
+        throw new Error('لا يمكن تعديل حالة طلب تم تسليمه إلا بالإرجاع (returned)');
+      }
+
+      if (order.orderStatus === 'returned' && newStatus !== 'returned') {
+        throw new Error('الطلب مرتجع بالفعل ولا يمكن تعديل حالته');
       }
 
       // Check timeout when confirming a pending draft:
@@ -801,7 +919,7 @@ const updateOrderStatus = async (orderId, newStatus) => {
           // The reservation expired! Transition to expired and restore stock under lock
           if (order.inventoryTracked === true) {
             const items = typeof order.orders === 'string' ? JSON.parse(order.orders) : order.orders;
-            await restoreStock(items, { t });
+            await restoreStock(items, { t, orderId: order.id, orderCode: order.orderCode });
           }
           await order.update(
             { orderStatus: 'expired', inventoryTracked: false, status: false },
@@ -816,11 +934,26 @@ const updateOrderStatus = async (orderId, newStatus) => {
         }
       }
 
-      const isDelivered = newStatus === 'delivered';
+      if (newStatus === 'delivered') {
+        const { inventoryService } = require('./inventoryService');
+        await inventoryService.deliverOrder({ orderId: order.id, transaction: t });
+        await t.commit();
+        const deliveredOrder = await db.order.findByPk(order.id);
+        return sanitizeOrder(deliveredOrder);
+      }
+
+      if (newStatus === 'returned') {
+        const { inventoryService } = require('./inventoryService');
+        await inventoryService.returnDeliveredOrder({ orderId: order.id, reason: 'إرجاع بواسطة الإدارة', transaction: t });
+        await t.commit();
+        const returnedOrder = await db.order.findByPk(order.id);
+        return sanitizeOrder(returnedOrder);
+      }
+
       await order.update(
         {
           orderStatus: newStatus,
-          status: isDelivered,
+          status: false,
         },
         { transaction: t }
       );

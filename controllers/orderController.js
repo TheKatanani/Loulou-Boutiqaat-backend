@@ -17,11 +17,27 @@ const parseOrders = (orders) => {
   return orders;
 };
 
-const formatOrder = (order) => {
+const formatOrder = (order, isAdmin = false) => {
   if (!order) return order;
   const o = order.dataValues ? { ...order.dataValues } : { ...order };
   o.orders = parseOrders(o.orders);
   delete o.secretToken; // Never leak secretToken in public/authenticated list APIs
+
+  // Keep purchasing & COGS valuation private from non-admin/editor users
+  if (!isAdmin) {
+    delete o.totalPurchaseCost;
+    delete o.hasUnknownCost;
+    if (Array.isArray(o.orders)) {
+      o.orders = o.orders.map((item) => {
+        const safe = { ...item };
+        delete safe.unitCost;
+        delete safe.itemCOGS;
+        delete safe.itemGrossProfit;
+        return safe;
+      });
+    }
+  }
+
   return o;
 };
 
@@ -96,12 +112,12 @@ const getOrders = async (req, res) => {
   }
 
   try {
-    const whereClause = isAdmin ? {} : { userId };
+    const whereClause = isAdmin ? { archived: false } : { userId, archived: false };
     let orders = await Order.findAll({
       where: whereClause,
       order: [['id', 'DESC']],
     });
-    let newOrders = (orders || []).map(formatOrder);
+    let newOrders = (orders || []).map((o) => formatOrder(o, isAdmin));
     res.status(200).send(newOrders);
   } catch (err) {
     res.status(400).json({ message: err?.message || err });
@@ -330,18 +346,26 @@ const updateOrder = async (req, res) => {
     }
 
     const foundedItem = await Order.findOne({ where: { id } });
-    if (foundedItem) {
-      await Order.update(req.body, { where: { id } });
-      const order = await Order.findOne({ where: { id } });
-      res.json(formatOrder(order));
-    } else {
-      res.status(404).json({ message: 'can not found this order!' });
+    if (!foundedItem) {
+      return res.status(404).json({ message: 'can not found this order!' });
     }
+
+    // Only allow safe metadata fields; orders array, totalCost, and inventoryTracked are strictly protected
+    const allowedFields = ['customerName', 'customerPhone', 'location', 'paid'];
+    const updateData = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    await foundedItem.update(updateData);
+    res.json(formatOrder(foundedItem, true));
   } catch (err) {
     const statusCode = err.statusCode || 400;
     return res.status(statusCode).json({
       message: err?.message || err,
-      ...(err.order ? { order: formatOrder(err.order) } : {}),
+      ...(err.order ? { order: formatOrder(err.order, true) } : {}),
     });
   }
 };
@@ -349,27 +373,46 @@ const updateOrder = async (req, res) => {
 const deleteOrder = async (req, res) => {
   const id = req.params.id;
   try {
-    // Release stock before deleting if pending or confirmed
-    await orderService.cancelOrExpireOrder(id, 'cancelled').catch(() => {});
-
-    if (!db.isConnected) {
-      const index = (db.mockData.mockOrders || []).findIndex((o) => o.id == id);
-      if (index === -1) {
-        return res.status(404).json({ message: 'order is not found!' });
-      }
-      db.mockData.mockOrders.splice(index, 1);
-      return res.status(200).json(Number(id));
-    }
-
     const foundedItem = await Order.findOne({ where: { id } });
-    if (foundedItem) {
-      await Order.destroy({ where: { id } });
-      res.status(200).json(Number(id));
-    } else {
-      res.status(404).json({ message: 'order is not found!' });
+    if (!foundedItem) {
+      return res.status(404).json({ message: 'order is not found!' });
     }
+
+    // Release stock before archiving if pending or confirmed
+    if (foundedItem.orderStatus === 'pending_whatsapp' || foundedItem.orderStatus === 'confirmed') {
+      await orderService.cancelOrExpireOrder(id, 'cancelled').catch(() => {});
+    }
+
+    // Replace destructive deletion of posted records with archiving/reversal
+    await foundedItem.update({ archived: true });
+    return res.status(200).json(Number(id));
   } catch (err) {
     res.status(400).json({ message: err?.message || err });
+  }
+};
+
+/**
+ * Admin returns a delivered order: separate audited flow
+ */
+const adminReturnOrderHandler = async (req, res) => {
+  const id = req.params.id;
+  const { reason } = req.body;
+  try {
+    const { inventoryService } = require('../services/inventoryService');
+    const returned = await inventoryService.returnDeliveredOrder({
+      orderId: id,
+      reason: reason || 'إرجاع للعميل',
+      userId: req.id || null,
+    });
+    return res.status(200).json({
+      message: 'تم إرجاع الطلب وإعادة الكميات للمخزون بنجاح',
+      order: formatOrder(returned, true),
+    });
+  } catch (err) {
+    const statusCode = err.statusCode || 400;
+    return res.status(statusCode).json({
+      message: err.message || 'تعذر إرجاع الطلب',
+    });
   }
 };
 
@@ -417,4 +460,5 @@ module.exports = {
   getWhatsAppDraftHandler,
   cancelWhatsAppDraftHandler,
   adminUpdateStatusHandler,
+  adminReturnOrderHandler,
 };

@@ -11,6 +11,7 @@ const {
   getWhatsAppDraftHandler,
   cancelWhatsAppDraftHandler,
   adminUpdateStatusHandler,
+  adminReturnOrderHandler,
 } = require('../../controllers/orderController');
 const verifyJWT = require('../../middleware/verifyJWT');
 const verifyRoles = require('../../middleware/verifyRoles');
@@ -38,6 +39,9 @@ router.route('/cancel/:id')
 
 router.route('/admin/:id/status')
   .put(verifyRoles(ROLES_LIST.EDITOR, ROLES_LIST.ADMIN), adminUpdateStatusHandler);
+
+router.route('/admin/:id/return')
+  .post(verifyRoles(ROLES_LIST.EDITOR, ROLES_LIST.ADMIN), adminReturnOrderHandler);
 
 router.route('/:id')
   .get(getOrder)

@@ -91,6 +91,7 @@ db.social = require('./social.js')(sequelize, Sequelize.DataTypes);
 db.order = require('./order.js')(sequelize, Sequelize.DataTypes);
 db.whatsappConversation = require('./whatsappConversation.js')(sequelize, Sequelize.DataTypes);
 db.whatsappMessage = require('./whatsappMessage.js')(sequelize, Sequelize.DataTypes);
+db.stockMovement = require('./stockMovement.js')(sequelize, Sequelize.DataTypes);
 
 // Map capitalized names so model associations (e.g. models.Category, models.Product) resolve correctly
 db.User = db.users;
@@ -101,6 +102,7 @@ db.Category = db.category;
 db.CountryCode = db.countryCode;
 db.Social = db.social;
 db.Order = db.order;
+db.StockMovement = db.stockMovement;
 
 // Run model associations once per unique model definition
 const processedModels = new Set();
@@ -118,13 +120,42 @@ const ensureSchemaUpdates = async () => {
   const queryInterface = db.sequelize.getQueryInterface();
   try {
     const productDesc = await queryInterface.describeTable('Products').catch(() => null);
-    if (productDesc && !productDesc.stock) {
-      await queryInterface.addColumn('Products', 'stock', {
-        type: Sequelize.DataTypes.INTEGER,
-        defaultValue: 0,
-        allowNull: false
-      }).catch(err => console.warn('stock add column notice:', err.message));
-      console.log('Added column stock to Products table.');
+    if (productDesc) {
+      if (!productDesc.stock) {
+        await queryInterface.addColumn('Products', 'stock', {
+          type: Sequelize.DataTypes.INTEGER,
+          defaultValue: 0,
+          allowNull: false
+        }).catch(err => console.warn('stock add column notice:', err.message));
+        console.log('Added column stock to Products table.');
+      }
+      if (!productDesc.physicalStock) {
+        await queryInterface.addColumn('Products', 'physicalStock', {
+          type: Sequelize.DataTypes.INTEGER,
+          defaultValue: 0,
+          allowNull: false
+        }).catch(err => console.warn('physicalStock add column notice:', err.message));
+      }
+      if (!productDesc.reservedStock) {
+        await queryInterface.addColumn('Products', 'reservedStock', {
+          type: Sequelize.DataTypes.INTEGER,
+          defaultValue: 0,
+          allowNull: false
+        }).catch(err => console.warn('reservedStock add column notice:', err.message));
+      }
+      if (!productDesc.unitCost) {
+        await queryInterface.addColumn('Products', 'unitCost', {
+          type: Sequelize.DataTypes.DECIMAL(10, 2),
+          allowNull: true,
+          defaultValue: null
+        }).catch(err => console.warn('unitCost add column notice:', err.message));
+      }
+      if (!productDesc.isArchived) {
+        await queryInterface.addColumn('Products', 'isArchived', {
+          type: Sequelize.DataTypes.BOOLEAN,
+          defaultValue: false
+        }).catch(err => console.warn('isArchived add column notice:', err.message));
+      }
     }
   } catch (e) {
     console.warn('Product schema check:', e.message);
@@ -199,9 +230,66 @@ const ensureSchemaUpdates = async () => {
           allowNull: true
         }).catch(err => console.warn('secretToken notice:', err.message));
       }
+      if (!orderDesc.costSnapshotted) {
+        await queryInterface.addColumn('Orders', 'costSnapshotted', {
+          type: Sequelize.DataTypes.BOOLEAN,
+          defaultValue: false
+        }).catch(err => console.warn('costSnapshotted notice:', err.message));
+      }
+      if (!orderDesc.totalPurchaseCost) {
+        await queryInterface.addColumn('Orders', 'totalPurchaseCost', {
+          type: Sequelize.DataTypes.DECIMAL(10, 2),
+          allowNull: true
+        }).catch(err => console.warn('totalPurchaseCost notice:', err.message));
+      }
+      if (!orderDesc.hasUnknownCost) {
+        await queryInterface.addColumn('Orders', 'hasUnknownCost', {
+          type: Sequelize.DataTypes.BOOLEAN,
+          defaultValue: false
+        }).catch(err => console.warn('hasUnknownCost notice:', err.message));
+      }
+      if (!orderDesc.deliveredAt) {
+        await queryInterface.addColumn('Orders', 'deliveredAt', {
+          type: Sequelize.DataTypes.DATE,
+          allowNull: true
+        }).catch(err => console.warn('deliveredAt notice:', err.message));
+      }
+      if (!orderDesc.returnedAt) {
+        await queryInterface.addColumn('Orders', 'returnedAt', {
+          type: Sequelize.DataTypes.DATE,
+          allowNull: true
+        }).catch(err => console.warn('returnedAt notice:', err.message));
+      }
+      if (!orderDesc.returnReason) {
+        await queryInterface.addColumn('Orders', 'returnReason', {
+          type: Sequelize.DataTypes.TEXT,
+          allowNull: true
+        }).catch(err => console.warn('returnReason notice:', err.message));
+      }
+      if (!orderDesc.archived) {
+        await queryInterface.addColumn('Orders', 'archived', {
+          type: Sequelize.DataTypes.BOOLEAN,
+          defaultValue: false
+        }).catch(err => console.warn('archived notice:', err.message));
+      }
     }
   } catch (e) {
     console.warn('Orders schema check:', e.message);
+  }
+
+  try {
+    const smDesc = await queryInterface.describeTable('StockMovements').catch(() => null);
+    if (smDesc) {
+      if (!smDesc.idempotencyKey) {
+        await queryInterface.addColumn('StockMovements', 'idempotencyKey', {
+          type: Sequelize.DataTypes.STRING(128),
+          allowNull: true,
+          unique: true,
+        }).catch(err => console.warn('StockMovements idempotencyKey notice:', err.message));
+      }
+    }
+  } catch (e) {
+    console.warn('StockMovements schema check:', e.message);
   }
 };
 

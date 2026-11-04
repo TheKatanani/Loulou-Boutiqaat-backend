@@ -50,6 +50,25 @@ module.exports = (sequelize, DataTypes) => {
     status: {
       type: DataTypes.BOOLEAN, // Backward compatibility: true if delivered, else false
       defaultValue: false
+    },
+    costSnapshotted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
+    totalPurchaseCost: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true
+    },
+    hasUnknownCost: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
+    deliveredAt: DataTypes.DATE,
+    returnedAt: DataTypes.DATE,
+    returnReason: DataTypes.TEXT,
+    archived: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
     }
   }, {});
 
@@ -58,6 +77,10 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'userId',
       targetKey: 'id',
       as: 'user'
+    });
+    Order.hasMany(models.StockMovement, {
+      foreignKey: 'orderId',
+      as: 'stockMovements'
     });
   };
 
